@@ -10,3 +10,6 @@ export type { Evidence, EvidenceBundle, EvidenceKind, EvidenceSource, EvidencePr
 export { EVIDENCE_SCHEMA_VERSION, isEvidence, validateEvidenceBundle } from "./evidence-schema.js";
 export { createEvidenceBundle, ingestGitHubActionsRun, ingestTestEvidence, ingestGitDiffEvidence, ingestPullRequestEvidence } from "./ingestion.js";
 export { evidenceBundleToAgentRun } from "./normalize.js";
+
+export type { GitHubRepositorySnapshot, GitHubCommitSnapshot, GitHubPullRequestSnapshot } from "./github-intelligence.js";
+export { ingestRepositorySnapshot, ingestCommitSnapshot, ingestPullRequestSnapshot } from "./github-intelligence.js";
