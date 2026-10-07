@@ -18,3 +18,5 @@ export type { BenchmarkRun, BenchmarkEntry } from "./benchmark.js";
 export { rankAgents } from "./benchmark.js";
 export type { AgentAdapter } from "./adapters.js";
 export { FunctionAgentAdapter } from "./adapters.js";
+export type { GitHubApiCollectorOptions } from "./github-api.js";
+export { GitHubApiCollector, GitHubApiError, createGitHubApiCollector } from "./github-api.js";
