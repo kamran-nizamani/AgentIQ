@@ -1,15 +1,20 @@
-export type {
-  AgentEvaluation,
-  AgentRun,
-  ScoreBreakdown,
-  TaskOutcome,
-} from "./types.js";
-
+export type { AgentEvaluation, AgentRun, ScoreBreakdown, TaskOutcome } from "./types.js";
 export { evaluateAgentRun } from "./scoring.js";
 export type { Evidence, EvidenceBundle, EvidenceKind, EvidenceSource, EvidenceProvenance, GitHubActionsEvidenceInput, TestEvidenceInput, GitDiffEvidenceInput, PullRequestEvidenceInput } from "./evidence.js";
 export { EVIDENCE_SCHEMA_VERSION, isEvidence, validateEvidenceBundle } from "./evidence-schema.js";
 export { createEvidenceBundle, ingestGitHubActionsRun, ingestTestEvidence, ingestGitDiffEvidence, ingestPullRequestEvidence } from "./ingestion.js";
 export { evidenceBundleToAgentRun } from "./normalize.js";
-
 export type { GitHubRepositorySnapshot, GitHubCommitSnapshot, GitHubPullRequestSnapshot } from "./github-intelligence.js";
 export { ingestRepositorySnapshot, ingestCommitSnapshot, ingestPullRequestSnapshot } from "./github-intelligence.js";
+export type { GitHubCollector, GitHubCollectorOptions } from "./github-collector.js";
+export { collectGitHubEvidence } from "./github-collector.js";
+export type { RiskSignal, RiskSeverity } from "./risk.js";
+export { extractRiskSignals } from "./risk.js";
+export type { EvaluationPolicy, EvaluationReport } from "./evaluation.js";
+export { DEFAULT_POLICY, evaluateEvidence } from "./evaluation.js";
+export type { HistoricalSummary, TrendPoint } from "./analytics.js";
+export { summarizeEvaluations, toTrend } from "./analytics.js";
+export type { BenchmarkRun, BenchmarkEntry } from "./benchmark.js";
+export { rankAgents } from "./benchmark.js";
+export type { AgentAdapter } from "./adapters.js";
+export { FunctionAgentAdapter } from "./adapters.js";
