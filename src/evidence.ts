@@ -1,5 +1,5 @@
 export type EvidenceSource = "github" | "github-actions" | "test-report" | "git-diff" | "pull-request" | "generic";
-export type EvidenceKind = "repository" | "workflow-run" | "job" | "step" | "test-suite" | "test-case" | "diff" | "pull-request" | "commit";
+export type EvidenceKind = "repository" | "workflow-run" | "workflow-job" | "job" | "step" | "test-suite" | "test-case" | "diff" | "pull-request" | "commit" | "review" | "comment";
 export interface EvidenceProvenance { source: EvidenceSource; sourceId: string; collectedAt: string; schemaVersion: string; }
 export interface Evidence { id: string; kind: EvidenceKind; timestamp: string; provenance: EvidenceProvenance; data: Record<string, unknown>; }
 export interface EvidenceBundle { schemaVersion: "1.0"; evidence: Evidence[]; }

@@ -1,5 +1,6 @@
 import type { GitHubCollector } from "./github-collector.js";
 import type { GitHubCommitSnapshot, GitHubPullRequestSnapshot, GitHubRepositorySnapshot } from "./github-intelligence.js";
+import type { GitHubCommentSnapshot, GitHubReviewSnapshot, GitHubWorkflowJobSnapshot, GitHubWorkflowRunSnapshot } from "./github-ci.js";
 
 export interface GitHubApiCollectorOptions {
   token?: string;
