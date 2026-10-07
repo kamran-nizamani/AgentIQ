@@ -1577,6 +1577,7 @@ AgentIQ is currently in the **foundation → evidence ingestion** transition.
 ### Current
 
 - [x] Typed evaluation core
+- [x] GitHub REST API collector
 - [x] Deterministic scoring
 - [x] Score breakdown
 - [x] Recommendations
@@ -1623,7 +1624,7 @@ Build the measurement layer for AI-powered software engineering.
 - [x] Commit identity/message evidence
 - [x] Pull request lifecycle evidence
 - [x] Review decision evidence
-- [ ] GitHub API collector
+- [x] GitHub API collector
 - [ ] CI/workflow history collector
 - [ ] Review/comment evidence collector
 - [ ] Risk signal extraction
