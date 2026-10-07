@@ -506,7 +506,7 @@ Goal: establish a clean, typed, deterministic foundation.
 
 # Phase 1 — Evidence Ingestion
 
-**Status: 🔵 Next major milestone**
+**Status: 🟢 In progress**
 
 Goal: turn real agent execution evidence into canonical `AgentRun` objects.
 
@@ -514,24 +514,24 @@ Goal: turn real agent execution evidence into canonical `AgentRun` objects.
 
 - [ ] Parse workflow run metadata.
 - [ ] Identify agent-related workflows.
-- [ ] Capture job status.
+- [x] Capture job status.
 - [ ] Capture step status.
 - [ ] Capture duration.
 - [ ] Capture artifacts.
 - [ ] Capture test reports.
-- [ ] Capture commit SHA.
-- [ ] Capture PR association.
-- [ ] Normalize CI evidence.
+- [x] Capture commit SHA.
+- [x] Capture PR association.
+- [x] Normalize CI evidence.
 
 ### Generic evidence ingestion
 
-- [ ] JSON evidence format.
-- [ ] JSON Schema.
-- [ ] Runtime validation.
-- [ ] Evidence versioning.
-- [ ] Provenance metadata.
-- [ ] Timestamp normalization.
-- [ ] Source identifiers.
+- [x] JSON evidence format.
+- [x] Canonical TypeScript schema.
+- [x] Runtime validation.
+- [x] Evidence versioning.
+- [x] Provenance metadata.
+- [x] Timestamp normalization.
+- [x] Source identifiers.
 - [ ] Evidence confidence.
 
 ### Test evidence
@@ -539,7 +539,7 @@ Goal: turn real agent execution evidence into canonical `AgentRun` objects.
 - [ ] JUnit XML.
 - [ ] Vitest/Jest output.
 - [ ] Pytest output.
-- [ ] Generic test result adapter.
+- [x] Generic test result adapter.
 - [ ] Coverage evidence.
 - [ ] Failure classification.
 
@@ -1587,11 +1587,11 @@ AgentIQ is currently in the **foundation → evidence ingestion** transition.
 
 ### Next
 
-- [ ] Canonical evidence schema
-- [ ] GitHub Actions ingestion
-- [ ] Test-result ingestion
-- [ ] Git diff evidence
-- [ ] PR lifecycle evidence
+- [x] Canonical evidence schema
+- [x] GitHub Actions ingestion
+- [x] Test-result ingestion
+- [x] Git diff evidence
+- [x] PR lifecycle evidence
 - [ ] Persistent run history
 - [ ] Evaluation API
 - [ ] Dashboard
