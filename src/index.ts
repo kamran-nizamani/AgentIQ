@@ -20,3 +20,6 @@ export type { AgentAdapter } from "./adapters.js";
 export { FunctionAgentAdapter } from "./adapters.js";
 export type { GitHubApiCollectorOptions } from "./github-api.js";
 export { GitHubApiCollector, GitHubApiError, createGitHubApiCollector } from "./github-api.js";
+
+export type { GitHubWorkflowRunSnapshot, GitHubWorkflowJobSnapshot, GitHubReviewSnapshot, GitHubCommentSnapshot } from "./github-ci.js";
+export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnapshot, ingestCommentSnapshot } from "./github-ci.js";
