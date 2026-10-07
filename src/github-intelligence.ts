@@ -1,0 +1,10 @@
+import type { Evidence } from "./evidence.js";
+import { EVIDENCE_SCHEMA_VERSION } from "./evidence-schema.js";
+export interface GitHubRepositorySnapshot { fullName:string; defaultBranch:string; visibility?:string; archived?:boolean; sizeKb?:number; }
+export interface GitHubCommitSnapshot { sha:string; message:string; author?:string|null; authoredAt?:string|null; }
+export interface GitHubPullRequestSnapshot { number:number; title:string; state:"open"|"closed"; merged:boolean; baseSha:string; headSha:string; additions:number; deletions:number; changedFiles:number; createdAt:string; updatedAt?:string|null; mergedAt?:string|null; reviewDecision?:"approved"|"changes_requested"|"review_required"|null; }
+const now=()=>new Date().toISOString();
+function make(id:string,kind:Evidence["kind"],sourceId:string,data:Record<string,unknown>,timestamp?:string):Evidence { return {id,kind,timestamp:timestamp??now(),provenance:{source:"generic",sourceId,collectedAt:now(),schemaVersion:EVIDENCE_SCHEMA_VERSION},data}; }
+export function ingestRepositorySnapshot(repo:GitHubRepositorySnapshot):Evidence { return make("github:repository:"+repo.fullName,"commit","repository:"+repo.fullName,{repository:repo.fullName,defaultBranch:repo.defaultBranch,visibility:repo.visibility??null,archived:repo.archived??false,sizeKb:repo.sizeKb??null}); }
+export function ingestCommitSnapshot(repo:string,commit:GitHubCommitSnapshot):Evidence { return make("github:commit:"+repo+":"+commit.sha,"commit",commit.sha,{repository:repo,sha:commit.sha,message:commit.message,author:commit.author??null},commit.authoredAt??undefined); }
+export function ingestPullRequestSnapshot(repo:string,pr:GitHubPullRequestSnapshot):Evidence { return make("github:pr:"+repo+":"+pr.number,"pull-request","pr:"+repo+":"+pr.number,{repository:repo,number:pr.number,title:pr.title,state:pr.state,merged:pr.merged,baseSha:pr.baseSha,headSha:pr.headSha,additions:pr.additions,deletions:pr.deletions,changedFiles:pr.changedFiles,createdAt:pr.createdAt,updatedAt:pr.updatedAt??null,mergedAt:pr.mergedAt??null,reviewDecision:pr.reviewDecision??null},pr.updatedAt??pr.createdAt); }
