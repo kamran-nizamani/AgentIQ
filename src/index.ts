@@ -23,3 +23,6 @@ export { GitHubApiCollector, GitHubApiError, createGitHubApiCollector } from "./
 
 export type { GitHubWorkflowRunSnapshot, GitHubWorkflowJobSnapshot, GitHubReviewSnapshot, GitHubCommentSnapshot } from "./github-ci.js";
 export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnapshot, ingestCommentSnapshot } from "./github-ci.js";
+
+export type { GitHubWorkflowRunSnapshot, GitHubWorkflowJobSnapshot, GitHubReviewSnapshot, GitHubCommentSnapshot } from "./github-ci.js";
+export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnapshot, ingestCommentSnapshot } from "./github-ci.js";
