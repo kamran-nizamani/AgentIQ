@@ -1615,3 +1615,15 @@ License to be finalized as the project matures.
 **Evidence → Evaluation → Insight → Improvement**
 
 Build the measurement layer for AI-powered software engineering.
+
+
+## Phase 2 — GitHub Intelligence
+
+- [x] Repository metadata evidence
+- [x] Commit identity/message evidence
+- [x] Pull request lifecycle evidence
+- [x] Review decision evidence
+- [ ] GitHub API collector
+- [ ] CI/workflow history collector
+- [ ] Review/comment evidence collector
+- [ ] Risk signal extraction
