@@ -1,0 +1,53 @@
+name: AgentIQ Evidence
+on:
+  workflow_run:
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - name: Emit workflow evidence
+        env:
+          AGENTIQ_RUN_ID: ${{ github.event.workflow_run.id }}
+          AGENTIQ_REPOSITORY: ${{ github.repository }}
+          AGENTIQ_SHA: ${{ github.event.workflow_run.head_sha }}
+          AGENTIQ_WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          node --input-type=module <<'NODE'
+          const fs = await import("node:fs");
+          const evidence = {
+            schemaVersion: "1.0",
+            evidence: [{
+              id: "github-actions:run:" + process.env.AGENTIQ_RUN_ID,
+              kind: "workflow-run",
+              timestamp: new Date().toISOString(),
+              provenance: {
+                source: "github-actions",
+                sourceId: process.env.AGENTIQ_RUN_ID,
+                collectedAt: new Date().toISOString(),
+                schemaVersion: "1.0"
+              },
+              data: {
+                repository: process.env.AGENTIQ_REPOSITORY,
+                commitSha: process.env.AGENTIQ_SHA,
+                workflowName: process.env.AGENTIQ_WORKFLOW
+              }
+            }]
+          };
+          fs.writeFileSync("agentiq-evidence.json", JSON.stringify(evidence, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentiq-evidence
+          path: agentiq-evidence.json
