@@ -4,9 +4,13 @@
   "private": true,
   "description": "Provider-neutral evaluation engine for AI coding agents.",
   "type": "module",
+  "workspaces": ["apps/web"],
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web:dev": "npm --workspace @agentiq/web run dev",
+    "web:build": "npm --workspace @agentiq/web run build",
+    "web:typecheck": "npm --workspace @agentiq/web run typecheck"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
