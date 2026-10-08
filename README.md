@@ -745,9 +745,9 @@ Goal: provide a production-quality interface for exploring evaluations.
 
 #### Overview
 
-- [ ] Overall score.
-- [ ] Success rate.
-- [ ] Test pass rate.
+- [x] Overall score.
+- [x] Success rate.
+- [x] Test pass rate.
 - [ ] Cost.
 - [ ] Duration.
 - [ ] Safety incidents.
@@ -755,8 +755,8 @@ Goal: provide a production-quality interface for exploring evaluations.
 
 #### Run details
 
-- [ ] Score.
-- [ ] Score breakdown.
+- [x] Score.
+- [x] Score breakdown.
 - [ ] Evidence.
 - [ ] Timeline.
 - [ ] Changed files.
@@ -766,9 +766,9 @@ Goal: provide a production-quality interface for exploring evaluations.
 
 #### Trends
 
-- [ ] Score over time.
-- [ ] Cost over time.
-- [ ] Reliability over time.
+- [x] Score over time UI.
+- [x] Cost over time UI.
+- [x] Reliability over time UI.
 - [ ] Agent comparison.
 - [ ] Model comparison.
 
@@ -1103,7 +1103,7 @@ AgentIQ/
 │   └── workflows/
 │
 ├── apps/
-│   ├── web/                 # Dashboard
+│   ├── web/                 # React + Vite dashboard
 │   └── api/                 # API service
 │
 ├── packages/
@@ -1601,7 +1601,7 @@ AgentIQ is currently in the **foundation → evidence ingestion** transition.
 
 > **Do not build the dashboard before the evidence model is stable.**
 
-The quality of AgentIQ depends more on its evidence and evaluation model than on its UI.
+The quality of AgentIQ depends more on its evidence and evaluation model than on its UI. The dashboard is being built as a thin presentation layer so the same interface can later consume the canonical API without moving evaluation logic into React.
 
 ---
 
