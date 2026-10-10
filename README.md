@@ -1534,6 +1534,8 @@ to:
 
 ## Local development
 
+Requirements: Node.js 22+ and npm.
+
 The full local application uses the Node API and SQLite store:
 
 ```bash
