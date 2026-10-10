@@ -1,3 +1,4 @@
+import { durableStorageConfigured, getStoredRunDetail, listStoredRunSummaries, saveRunDetail, saveRunSummaries } from "./durable-store.js";
 import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
 import { parseTestLogSummary } from "../src/test-log.js";
 import { evaluateEvidence } from "../src/evaluation.js";
@@ -237,27 +238,37 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
   return { ...record, evidence, evaluation };
 }
 
-export async function listLiveRuns(options: { limit: number; offset: number }): Promise<{ data: LiveRunRecord[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: { source: string; repository: string; authenticated: boolean; generatedAt: string; note: string } }> {
+export async function listLiveRuns(options: { limit: number; offset: number }): Promise<{ data: LiveRunRecord[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: { source: string; repository: string; authenticated: boolean; generatedAt: string; note: string; storage: "supabase" | "github-live" | "unavailable" } }> {
   const repository = configuredRepository();
   const page = Math.floor(options.offset / 100) + 1;
   const withinPageOffset = options.offset % 100;
   const payload = await githubGet<GitHubRunsResponse>("/repos/" + repository + "/actions/runs?per_page=100&page=" + page);
-  const selected = payload.workflow_runs.slice(withinPageOffset, withinPageOffset + options.limit);
-  const data = selected.map((raw) => {
+  const pageSummaries = payload.workflow_runs.map((raw) => {
     const normalized = normalizeWorkflowRun(repository, raw);
     const { evidence: _evidence, evaluation: _evaluation, ...summary } = normalized;
     return summary;
   });
+  let storage: "supabase" | "github-live" | "unavailable" = durableStorageConfigured() ? "supabase" : "github-live";
+  let note = "Workflow runs are read live from GitHub Actions.";
+  let data = pageSummaries.slice(withinPageOffset, withinPageOffset + options.limit);
+  let total = payload.total_count;
+  if (durableStorageConfigured()) {
+    try {
+      await saveRunSummaries(repository, pageSummaries);
+      const archived = await listStoredRunSummaries({ repository, limit: options.limit, offset: options.offset });
+      if (archived.data.length > 0 || options.offset === 0) { data = archived.data; total = archived.total; }
+      note = "Workflow runs are synced from GitHub Actions and archived in Supabase Postgres. Opening a run stores its full evidence snapshot. Historical archive records survive Vercel deployments.";
+    } catch {
+      storage = "unavailable";
+      note = "GitHub Actions is live. Durable storage is configured but unavailable; this response uses live GitHub data and may not be archived.";
+    }
+  } else {
+    note = "Workflow runs are live from GitHub Actions. Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY plus the SQL migration to enable durable history.";
+  }
   return {
     data,
-    pagination: { total: payload.total_count, limit: options.limit, offset: options.offset, hasMore: options.offset + data.length < payload.total_count },
-    meta: {
-      source: "github-actions-live",
-      repository,
-      authenticated: Boolean(process.env.GITHUB_TOKEN),
-      generatedAt: new Date().toISOString(),
-      note: "The run list is lightweight workflow metadata; opening a run attempts to parse explicit test summaries from job logs and collect commit-level diff evidence. Unavailable evidence remains unassessed.",
-    },
+    pagination: { total, limit: options.limit, offset: options.offset, hasMore: options.offset + data.length < total },
+    meta: { source: storage === "supabase" ? "github-actions-live+supabase" : "github-actions-live", repository, authenticated: Boolean(process.env.GITHUB_TOKEN), generatedAt: new Date().toISOString(), note, storage },
   };
 }
 
@@ -313,7 +324,17 @@ async function collectCommitEvidence(repository: string, raw: GitHubRunApi, evid
 export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evidence: EvidenceBundle; evaluation: ReturnType<typeof evaluateEvidence>; jobs: GitHubJobApi[] }> {
   if (!/^\d+$/.test(runId)) throw new GitHubLiveError("Run ID must be a numeric GitHub Actions run ID.", 400);
   const repository = configuredRepository();
-  const raw = await githubGet<GitHubRunApi>("/repos/" + repository + "/actions/runs/" + runId);
+  let raw: GitHubRunApi;
+  try { raw = await githubGet<GitHubRunApi>("/repos/" + repository + "/actions/runs/" + runId); }
+  catch (error) {
+    if (durableStorageConfigured()) {
+      try {
+        const archived = await getStoredRunDetail(repository, runId);
+        if (archived && typeof archived === "object") return archived as LiveRunRecord & { evidence: EvidenceBundle; evaluation: ReturnType<typeof evaluateEvidence>; jobs: GitHubJobApi[] };
+      } catch { /* preserve the original GitHub error if the archive is unavailable */ }
+    }
+    throw error;
+  }
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
   await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
@@ -338,5 +359,10 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   normalized.diffEvidenceAvailable = normalized.evidence.evidence.some((item) => item.kind === "diff");
   normalized.riskAssessment = normalized.diffEvidenceAvailable ? "assessed" : "not-assessed";
   normalized.evaluation = refreshedEvaluation;
-  return { ...normalized, jobs: jobsPayload.jobs };
+  const detail = { ...normalized, jobs: jobsPayload.jobs };
+  if (durableStorageConfigured()) {
+    try { await saveRunDetail(repository, runId, detail, normalized.storedAt); }
+    catch { /* transient archive failures must not break live details */ }
+  }
+  return detail;
 }

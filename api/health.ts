@@ -1,3 +1,4 @@
+import { durableStorageConfigured } from "../server/durable-store.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { configuredRepository } from "../server/github-live.js";
 
@@ -16,7 +17,8 @@ export default function handler(req: IncomingMessage, res: ServerResponse): void
     data: {
       status: "ok",
       service: "agentiq-api",
-      storage: "github-live",
+      storage: durableStorageConfigured() ? "supabase-postgres" : "github-live",
+      durableStorageConfigured: durableStorageConfigured(),
       source: "GitHub Actions API",
       repository: configuredRepository(),
       authenticatedGitHub: Boolean(process.env.GITHUB_TOKEN),
