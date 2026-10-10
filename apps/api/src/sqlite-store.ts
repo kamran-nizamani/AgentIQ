@@ -1,4 +1,6 @@
 import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import type { AgentRunStore, RunHistoryQuery, StoredAgentRun } from "../../../src/storage.js";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -19,6 +21,7 @@ export class SQLiteAgentRunStore implements AgentRunStore {
   private readonly countByRepository: Database.Statement;
 
   constructor(filename = process.env.AGENTIQ_DB_PATH ?? "./data/agentiq.sqlite") {
+    if (filename !== ":memory:") mkdirSync(dirname(filename), { recursive: true });
     this.db = new Database(filename);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
