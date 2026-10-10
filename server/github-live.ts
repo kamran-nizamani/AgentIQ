@@ -237,7 +237,7 @@ function classifySensitivePath(path: string): "critical" | "high" | null {
   return null;
 }
 
-async function attachCommitDiff(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<void> {
+async function collectCommitEvidence(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<void> {
   if (!raw.head_sha || !/^[a-f0-9]{7,40}$/i.test(raw.head_sha)) return;
   try {
     const commit = await githubGet<GitHubCommitApi>("/repos/" + repository + "/commits/" + raw.head_sha);
@@ -277,5 +277,6 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   const raw = await githubGet<GitHubRunApi>("/repos/" + repository + "/actions/runs/" + runId);
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
+  await collectCommitEvidence(repository, raw, normalized.evidence);
   return { ...normalized, jobs: jobsPayload.jobs };
 }
