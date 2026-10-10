@@ -430,6 +430,19 @@ The evaluator should eventually expose the scoring configuration used for every 
 
 ---
 
+# Engineering Intelligence
+
+The web dashboard includes a **Universal Repository Inspector** and an **Engineering Intelligence** workspace for comparing up to five GitHub repositories. It summarizes available CI reliability, maintenance, Dependabot alerts, open pull requests, conservative PR review prompts, and human-reviewed remediation plans.
+
+- Health scores include evidence coverage and omit unavailable components instead of treating missing data as a pass.
+- CI failure summaries link back to GitHub and show failed jobs/steps when the API exposes them.
+- PR findings are heuristic by default. An optional server-side OpenAI-compatible model can supplement them using `AGENTIQ_AI_API_KEY`, `AGENTIQ_AI_BASE_URL`, and `AGENTIQ_AI_MODEL`.
+- Remediation plans are advisory only: this workspace does not execute repository code, push patches, or merge PRs.
+
+See [Engineering Intelligence docs](docs/engineering-intelligence.md) for score weights, environment settings, and limitations.
+
+---
+
 # Roadmap
 
 The roadmap is intentionally staged.
