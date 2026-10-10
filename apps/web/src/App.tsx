@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type IconName =
   | "grid" | "activity" | "git" | "bar" | "shield" | "settings"
@@ -41,12 +41,38 @@ const nav = [
   { label: "Audit & Safety", icon: "shield" as const },
 ];
 
-const runs = [
-  { id: "run_8F2A", repo: "AgentIQ", agent: "Claude Code", task: "Add CI evidence collector", score: 94, status: "Success", time: "8m 24s", ago: "12 min ago" },
-  { id: "run_7C91", repo: "RepoPilot", agent: "Codex", task: "Fix PR patch parser", score: 87, status: "Success", time: "11m 02s", ago: "38 min ago" },
-  { id: "run_6D14", repo: "AgentIQ", agent: "Claude Code", task: "Normalize review events", score: 78, status: "Partial", time: "14m 47s", ago: "1h ago" },
-  { id: "run_5A82", repo: "Dashboard", agent: "Codex", task: "Repair Supabase auth flow", score: 61, status: "Failed", time: "6m 31s", ago: "2h ago" },
-];
+type DashboardRun = { id: string; repo: string; agent: string; task: string; score: number; status: string; time: string; ago: string };
+
+type RunsResponse = {
+  data: Array<{
+    runId: string;
+    repository: string | null;
+    score: number;
+    outcome: "success" | "partial" | "failure";
+    storedAt: string;
+    agent: string;
+    task: string;
+    durationMs: number;
+  }>;
+  pagination: { total: number; limit: number; offset: number; hasMore: boolean };
+  meta?: { mode?: string; note?: string };
+};
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function formatAgo(value: string): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 function ScoreRing({ score }: { score: number }) {
   const radius = 28;
@@ -83,10 +109,43 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [range, setRange] = useState("30d");
+  const [runs, setRuns] = useState<DashboardRun[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
+  const [runsError, setRunsError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadRuns() {
+      setLoadingRuns(true);
+      setRunsError("");
+      try {
+        const response = await fetch("/api/runs?limit=20&offset=0", { signal: controller.signal });
+        if (!response.ok) throw new Error(`Run history request failed (${response.status}).`);
+        const payload = await response.json() as RunsResponse;
+        setRuns(payload.data.map((row) => ({
+          id: row.runId,
+          repo: row.repository ?? "Unknown repository",
+          agent: row.agent,
+          task: row.task,
+          score: row.score,
+          status: row.outcome === "success" ? "Success" : row.outcome === "partial" ? "Partial" : "Failed",
+          time: formatDuration(row.durationMs),
+          ago: formatAgo(row.storedAt),
+        })));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setRunsError(error instanceof Error ? error.message : "Unable to load run history.");
+      } finally {
+        if (!controller.signal.aborted) setLoadingRuns(false);
+      }
+    }
+    void loadRuns();
+    return () => controller.abort();
+  }, []);
 
   const filteredRuns = useMemo(
     () => runs.filter((run) => [run.repo, run.agent, run.task, run.status].join(" ").toLowerCase().includes(query.toLowerCase())),
-    [query],
+    [runs, query],
   );
 
   return (
@@ -208,7 +267,9 @@ function App() {
                   ))}
                 </tbody>
               </table>
-              {filteredRuns.length === 0 && <div className="empty">No evaluations match “{query}”.</div>}
+              {loadingRuns && <div className="empty">Loading evaluations from the AgentIQ API…</div>}
+              {!loadingRuns && runsError && <div className="empty">{runsError} Start the API with <code>npm run api:dev</code>.</div>}
+              {!loadingRuns && !runsError && filteredRuns.length === 0 && <div className="empty">No evaluations match “{query}”.</div>}
             </div>
           </section>
 
@@ -223,7 +284,7 @@ function App() {
             </div>
           </section>
 
-          <footer className="footer"><span>AgentIQ v0.1 · Evidence before opinion.</span><span><span className="footer-dot" /> API connected · Last sync 2 min ago</span></footer>
+          <footer className="footer"><span>AgentIQ v0.1 · Evidence before opinion.</span><span><span className="footer-dot" /> API run history · demo data</span></footer>
         </div>
       </main>
     </div>

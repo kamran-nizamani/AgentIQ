@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_POLICY, evaluateEvidence } from "../src/evaluation.js";
-import { createEvidenceBundle } from "../src/ingestion.js";
+import { createEvidenceBundle, ingestGitHubActionsRun, ingestTestEvidence } from "../src/ingestion.js";
 import { evidenceBundleToAgentRun } from "../src/normalize.js";
 import { InMemoryAgentRunStore, toRunHistoryRow, type StoredAgentRun } from "../src/storage.js";
 
 function record(id = "42"): StoredAgentRun {
   const evidence = createEvidenceBundle([
-    { runId: id, workflowName: "CI", status: "completed", conclusion: "success", repository: "kamran-nizamani/AgentIQ", commitSha: "abc" },
-    { framework: "vitest", total: 10, passed: 10, failed: 0, sourceId: "tests:" + id }
+    ...ingestGitHubActionsRun({ runId: id, workflowName: "CI", status: "completed", conclusion: "success", repository: "kamran-nizamani/AgentIQ", commitSha: "abc" }),
+    ingestTestEvidence({ framework: "vitest", total: 10, passed: 10, failed: 0, sourceId: "tests:" + id })
   ]);
   const run = evidenceBundleToAgentRun(evidence);
   return { run, evidence, evaluation: evaluateEvidence(evidence, run, DEFAULT_POLICY), storedAt: "2026-10-09T00:00:00.000Z" };

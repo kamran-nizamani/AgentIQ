@@ -20,7 +20,7 @@ export function evidenceBundleToAgentRun(bundle:EvidenceBundle):AgentRun {
   const linesAdded=diffs.reduce((n,d)=>n+asNumber(d.linesAdded),0);
   const linesDeleted=diffs.reduce((n,d)=>n+asNumber(d.linesDeleted),0);
 
-  const start=workflow.timestamp;
+  const start=String(wd.startedAt??workflow.timestamp);
   const end=String(wd.completedAt??workflow.timestamp);
   const durationMs=Math.max(0,Date.parse(end)-Date.parse(start));
 

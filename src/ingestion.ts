@@ -7,6 +7,7 @@ function makeEvidence(id:string,kind:Evidence["kind"],source:Evidence["provenanc
 export function ingestGitHubActionsRun(input:GitHubActionsEvidenceInput):Evidence[] {
   return [makeEvidence("github-actions:run:"+input.runId,"workflow-run","github-actions",String(input.runId),{
     workflowName:input.workflowName,status:input.status,conclusion:input.conclusion??null,
+    startedAt:input.startedAt??null,completedAt:input.completedAt??null,
     repository:input.repository,commitSha:input.commitSha,prNumber:input.prNumber??null
   },input.completedAt??input.startedAt??now())];
 }

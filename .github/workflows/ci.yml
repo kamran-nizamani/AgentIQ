@@ -15,4 +15,7 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run typecheck
+      - run: npm run api:typecheck
+      - run: npm run web:typecheck
+      - run: npm run web:build
       - run: npm test

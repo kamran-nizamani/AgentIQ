@@ -1543,6 +1543,19 @@ to:
 npm install
 ```
 
+## Run the full application
+
+Install dependencies, then start the API and frontend together:
+
+```bash
+npm install
+npm run dev
+```
+
+The dashboard is available at `http://localhost:5173`; Vite proxies `/api/*` to the local API on `http://127.0.0.1:8787`.
+
+For separate processes, use `npm run api:dev` and `npm run web:dev`. The current API seeds demo runs in memory; it is a development integration, not yet live GitHub ingestion or durable storage. See [`apps/api/README.md`](apps/api/README.md) for endpoints and limitations.
+
 ## Run tests
 
 ```bash
@@ -1572,7 +1585,7 @@ Before adding a feature:
 
 # Project Status
 
-AgentIQ is currently in the **foundation → evidence ingestion** transition.
+AgentIQ has completed the evidence model and initial dashboard/API integration. The next milestone is connecting real GitHub/CI evidence to the API and replacing in-memory demo storage with durable persistence.
 
 ### Current
 
