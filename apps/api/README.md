@@ -1,29 +1,45 @@
 # AgentIQ API
 
-A small, read-only HTTP API over the canonical AgentIQ run-history store.
+A run-history API backed by persistent SQLite storage, with optional authenticated GitHub Actions collection.
 
 ## Run locally
 
-From the repository root:
-
 ```bash
 npm install
-npm run api:dev
+npm run dev
 ```
 
-The API listens on `http://127.0.0.1:8787` by default. Override `PORT` or `HOST` with environment variables.
+Frontend: `http://localhost:5173`; API: `http://127.0.0.1:8787`.
+
+SQLite data defaults to `./data/agentiq.sqlite`. Set `AGENTIQ_DB_PATH` to change the path. The API creates the parent directory if needed.
 
 ## Endpoints
 
-- `GET /api/health` — service status.
-- `GET /api/runs?limit=20&offset=0` — paginated run history.
-- `GET /api/runs?repository=owner/repo` — filter by repository.
-- `GET /api/runs/:id` — full run, evidence bundle, evaluation report, and history row.
+- `GET /api/health` — status and storage mode.
+- `GET /api/runs?limit=20&offset=0` — paginated history.
+- `GET /api/runs?repository=owner/repo` — repository filter.
+- `GET /api/runs/:id` — stored run, evidence, and evaluation.
+- `POST /api/ingest/github` — collect recent workflow runs and jobs from the configured GitHub repository.
 
-Pagination limits are validated: `limit` must be 1–100 and `offset` must be a non-negative integer. Errors use a consistent `{ error: { code, message } }` shape.
+## Live GitHub collection
 
-## Current limitation
+Set these environment variables before starting the API:
 
-The API seeds three **demo records** so the frontend works immediately. It uses `InMemoryAgentRunStore`, so records disappear when the process restarts. The list response explicitly marks its mode as `demo`. This is not production persistence and does not yet ingest live GitHub events. The existing `AgentRunStore` interface is the seam for adding SQLite/PostgreSQL and real ingestion without changing the API contract.
+- `AGENTIQ_GITHUB_REPOSITORY=owner/repo`
+- `GITHUB_TOKEN=...` — token with read-only repository metadata and Actions permissions.
+- `AGENTIQ_INGEST_TOKEN=...` — long random secret required as a Bearer token for ingestion.
+- `AGENTIQ_DB_PATH=./data/agentiq.sqlite` (optional)
+- `AGENTIQ_DEMO=false` (optional; prevents demo rows being seeded into an empty database)
 
-The API is read-only, accepts GET requests only, and binds to loopback by default. Do not expose it publicly without adding authentication, rate limits, and a production storage adapter.
+Then run:
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/ingest/github \
+  -H "Authorization: Bearer $AGENTIQ_INGEST_TOKEN"
+```
+
+The collector stores workflow-run and job evidence, normalizes each run, and computes deterministic evaluations. GitHub does not provide universal test counts or code-diff details for every workflow; these remain unknown/zero unless corresponding evidence is provided separately. Agent identity is not guessed.
+
+## Persistence and safety
+
+SQLite survives API restarts. Repeated collection is idempotent for a run with unchanged evidence; conflicting evidence for an existing run ID is rejected. The API binds to loopback by default, and ingestion requires a separate secret. Do not expose it publicly without TLS, read-endpoint authentication, rate limits, and backups. Never commit tokens to source control.
