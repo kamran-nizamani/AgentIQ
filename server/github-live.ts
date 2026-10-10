@@ -157,7 +157,6 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
   workflow.data.completedAt = raw.status === "completed" ? raw.updated_at : null;
   const jobEvidence = jobs.map((job) => ingestWorkflowJobSnapshot(repository, raw.id, toJobSnapshot(job)));
   const evidence = createEvidenceBundle([workflow, ...jobEvidence]);
-  await attachCommitDiff(repository, raw, evidence);
   const run = evidenceBundleToAgentRun(evidence);
   run.id = String(raw.id);
   run.taskOutcome = normalizeOutcome(raw.conclusion);
