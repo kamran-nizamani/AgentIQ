@@ -224,10 +224,17 @@ export async function listLiveRuns(options: { limit: number; offset: number }): 
 }
 
 function classifySensitivePath(path: string): "critical" | "high" | null {
-  const normalized = path.replace(/\\\\/g, "/").toLowerCase();
-  if (/(^|\\/)(\\.env(\\..*)?|id_rsa|id_ed25519|[^/]*private[-_]?key[^/]*|secrets?\\.(json|ya?ml|toml)|credentials?\\.(json|ya?ml|toml))$/.test(normalized) && !normalized.endsWith(".example")) return "critical";
-  if (/(^|\\/)(\\.github\\/workflows|auth|authorization|security|crypto|cryptography|deploy|terraform|k8s|kubernetes)(\\/|$)/.test(normalized) ||
-      /(^|\\/)(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|requirements[^/]*\\.txt|pyproject\\.toml|poetry\\.lock|cargo\\.toml|go\\.mod|go\\.sum)$/.test(normalized)) return "high";
+  const normalized = path.replaceAll("\\\\", "/").toLowerCase();
+  const parts = normalized.split("/");
+  const basename = parts[parts.length - 1] || normalized;
+  if ((basename.startsWith(".env") && basename !== ".env.example" && basename !== ".env.sample") ||
+      basename === "id_rsa" || basename === "id_ed25519" ||
+      basename.includes("private-key") || basename.includes("private_key") ||
+      ((basename.includes("secret") || basename.includes("credential")) &&
+       [".json", ".yaml", ".yml", ".toml"].some((ext) => basename.endsWith(ext)))) return "critical";
+  if (normalized.includes(".github/workflows/") ||
+      ["auth", "authorization", "security", "crypto", "cryptography", "deploy", "terraform", "k8s", "kubernetes"].some((segment) => parts.includes(segment)) ||
+      ["package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "cargo.toml", "go.mod", "go.sum"].includes(basename)) return "high";
   return null;
 }
 
@@ -239,7 +246,7 @@ async function attachCommitDiff(repository: string, raw: GitHubRunApi, evidence:
     const sensitiveFiles = files
       .map((file) => ({ path: file.filename, severity: classifySensitivePath(file.filename) }))
       .filter((file): file is { path: string; severity: "critical" | "high" } => file.severity !== null);
-    const dependencyFiles = files.filter((file) => /(^|\\/)(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|requirements[^/]*\\.txt|pyproject\\.toml|poetry\\.lock|cargo\\.toml|go\\.mod|go\\.sum)$/.test(file.filename.toLowerCase())).map((file) => file.filename);
+    const dependencyFiles = files.filter((file) => ["package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "cargo.toml", "go.mod", "go.sum"].includes(file.filename.toLowerCase().split("/").pop() || "")).map((file) => file.filename);
     const diffEvidence = ingestGitDiffEvidence({
       baseCommit: commit.parents?.[0]?.sha || raw.head_sha,
       headCommit: raw.head_sha,
