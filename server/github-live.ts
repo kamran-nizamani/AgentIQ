@@ -72,6 +72,8 @@ export type LiveRunRecord = {
   testEvidenceAvailable: boolean;
   diffEvidenceAvailable: boolean;
   riskAssessment: "not-assessed" | "assessed";
+  scoreStatus: "verified" | "provisional";
+  evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] };
 };
 
 export class GitHubLiveError extends Error {
@@ -234,6 +236,8 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
     testEvidenceAvailable,
     diffEvidenceAvailable,
     riskAssessment: diffEvidenceAvailable ? "assessed" : "not-assessed",
+    scoreStatus: evaluation.scoreStatus,
+    evidenceCoverage: evaluation.evidenceCoverage,
   };
   return { ...record, evidence, evaluation };
 }
@@ -358,6 +362,8 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   normalized.testEvidenceAvailable = normalized.evidence.evidence.some((item) => item.kind === "test-suite");
   normalized.diffEvidenceAvailable = normalized.evidence.evidence.some((item) => item.kind === "diff");
   normalized.riskAssessment = normalized.diffEvidenceAvailable ? "assessed" : "not-assessed";
+  normalized.scoreStatus = refreshedEvaluation.scoreStatus;
+  normalized.evidenceCoverage = refreshedEvaluation.evidenceCoverage;
   normalized.evaluation = refreshedEvaluation;
   const detail = { ...normalized, jobs: jobsPayload.jobs };
   if (durableStorageConfigured()) {
