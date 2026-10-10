@@ -1554,7 +1554,7 @@ npm run dev
 
 The dashboard is available at `http://localhost:5173`; Vite proxies `/api/*` to the local API on `http://127.0.0.1:8787`.
 
-For separate processes, use `npm run api:dev` and `npm run web:dev`. The current API seeds demo runs in memory; it is a development integration, not yet live GitHub ingestion or durable storage. See [`apps/api/README.md`](apps/api/README.md) for endpoints and limitations.
+For separate processes, use `npm run api:dev` and `npm run web:dev`. The API persists run history in SQLite (`./data/agentiq.sqlite`) and supports authenticated collection of GitHub Actions workflow/job evidence. See [`apps/api/README.md`](apps/api/README.md) for environment setup and security notes.
 
 ## Run tests
 
@@ -1585,7 +1585,7 @@ Before adding a feature:
 
 # Project Status
 
-AgentIQ has completed the evidence model and initial dashboard/API integration. The next milestone is connecting real GitHub/CI evidence to the API and replacing in-memory demo storage with durable persistence.
+AgentIQ now includes SQLite-backed run history and an authenticated endpoint for collecting GitHub Actions workflow/job evidence. Broader test-result and diff ingestion still require additional evidence adapters.
 
 ### Current
 
@@ -1606,9 +1606,10 @@ AgentIQ has completed the evidence model and initial dashboard/API integration. 
 - [x] Test-result ingestion
 - [x] Git diff evidence
 - [x] PR lifecycle evidence
-- [ ] Persistent run history
-- [ ] Evaluation API
-- [ ] Dashboard
+- [x] Persistent run history (SQLite)
+- [x] Evaluation/run-history API
+- [x] Dashboard API integration
+- [x] GitHub Actions workflow/job ingestion endpoint
 
 ### Guiding rule
 
