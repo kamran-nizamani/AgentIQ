@@ -49,6 +49,8 @@ export function createDemoStore(): InMemoryAgentRunStore {
       ingestTestEvidence({ framework: "vitest", total: item.total, passed: item.passed, failed: item.failed, durationMs: item.durationMs, sourceId: "tests:" + item.id }),
       ingestGitDiffEvidence({ baseCommit: "base-" + item.id, headCommit: "head-" + item.id, filesChanged: item.files, linesAdded: item.added, linesDeleted: item.deleted, sourceId: "diff:" + item.id }),
     ]);
+    evidence.evidence[0].data.agent = item.agent;
+    evidence.evidence[0].data.task = item.task;
     const run: AgentRun = {
       id: item.id,
       taskOutcome: item.outcome,
@@ -65,9 +67,6 @@ export function createDemoStore(): InMemoryAgentRunStore {
       storedAt: completedAt,
     };
     void store.save(record);
-    // Presentation metadata is intentionally carried by evidence, not used by the scorer.
-    evidence.evidence[0].data.agent = item.agent;
-    evidence.evidence[0].data.task = item.task;
   }
   return store;
 }
