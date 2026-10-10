@@ -198,7 +198,11 @@ export async function listLiveRuns(options: { limit: number; offset: number }): 
   const withinPageOffset = options.offset % 100;
   const payload = await githubGet<GitHubRunsResponse>("/repos/" + repository + "/actions/runs?per_page=100&page=" + page);
   const selected = payload.workflow_runs.slice(withinPageOffset, withinPageOffset + options.limit);
-  const data = selected.map((raw) => normalizeWorkflowRun(repository, raw));
+  const data = selected.map((raw) => {
+    const normalized = normalizeWorkflowRun(repository, raw);
+    const { evidence: _evidence, evaluation: _evaluation, ...summary } = normalized;
+    return summary;
+  });
   return {
     data,
     pagination: { total: payload.total_count, limit: options.limit, offset: options.offset, hasMore: options.offset + data.length < payload.total_count },
