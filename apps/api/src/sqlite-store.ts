@@ -4,6 +4,10 @@ import { dirname } from "node:path";
 import type { AgentRunStore, RunHistoryQuery, StoredAgentRun } from "../../../src/storage.js";
 
 const clone = <T>(value: T): T => structuredClone(value);
+const sameEvidence = (left: StoredAgentRun, right: StoredAgentRun): boolean => {
+  const canonical = (record: StoredAgentRun) => ({ ...record.evidence, evidence: record.evidence.evidence.map((item) => ({ ...item, provenance: { ...item.provenance, collectedAt: "" } })) });
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+};
 const repositoryOf = (record: StoredAgentRun): string | null => {
   const item = record.evidence.evidence.find((e) => typeof e.data.repository === "string");
   return item && typeof item.data.repository === "string" ? item.data.repository : null;
@@ -50,7 +54,7 @@ export class SQLiteAgentRunStore implements AgentRunStore {
       const existing = this.selectById.get(record.run.id) as Row | undefined;
       if (existing && existing.record_json !== json) {
         const old = JSON.parse(existing.record_json) as StoredAgentRun;
-        if (JSON.stringify(old.evidence) !== JSON.stringify(record.evidence)) {
+        if (!sameEvidence(old, record)) {
           throw new Error("Agent run already exists with different evidence: " + record.run.id);
         }
       }
