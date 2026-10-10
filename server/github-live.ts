@@ -211,7 +211,7 @@ export async function listLiveRuns(options: { limit: number; offset: number }): 
       repository,
       authenticated: Boolean(process.env.GITHUB_TOKEN),
       generatedAt: new Date().toISOString(),
-      note: "Workflow and job metadata are live. Test counts and code-diff risk remain unassessed until dedicated test-report and diff evidence is connected.",
+      note: "Workflow metadata is live; opening a run fetches its jobs and steps. Test counts and code-diff risk remain unassessed until dedicated test-report and diff evidence is connected.",
     },
   };
 }
