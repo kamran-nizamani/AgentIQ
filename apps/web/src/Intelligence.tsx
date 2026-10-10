@@ -109,7 +109,7 @@ export default function Intelligence() {
         <div className="intel-repo-stats"><span>★ {repo.repository.stars.toLocaleString()}</span><span>{repo.repository.language || "Language unknown"}</span><span>{repo.repository.license}</span><span>{repo.repository.archived ? "Archived" : repo.maintenance.lastPushAgeDays === null ? "Push date unknown" : "Pushed " + repo.maintenance.lastPushAgeDays + "d ago"}</span></div>
         <div className="intel-coverage"><span>Evidence coverage</span><strong>{repo.health.coverage}%</strong></div>
         <div className="intel-component-list">{repo.health.components.map((component) => <div key={component.key}><span>{component.label}<small>{component.detail}</small></span><strong className={component.score === null ? "muted" : component.score >= 80 ? "good" : component.score >= 60 ? "medium" : "bad"}>{component.score === null ? "N/A" : Math.round(component.score)}</strong></div>)}</div>
-        <div className="intel-card-footer"><span>{repo.ci.successRate === null ? "CI success rate unknown" : repo.ci.successRate + "% recent CI success"} · {repo.pullRequests.openCount === null ? "PR data unknown" : repo.pullRequests.openCount + " open PRs"}</span><button onClick={() => setTab("ci")}>Investigate signals →</button></div>
+        <div className="intel-card-footer"><span>{repo.ci.successRate === null ? "CI success rate unknown" : repo.ci.successRate + "% recent CI success"} · {repo.pullRequests.openCount === null ? "PR data unknown" : repo.pullRequests.openCount + " open PRs returned"}</span><button onClick={() => setTab("ci")}>Investigate signals →</button></div>
       </article>)}
       {results.filter((result) => !result.ok).map((result) => <article className="panel intel-repo-card intel-failed-card" key={result.input}><strong>{result.input}</strong><p>{result.error.message}</p></article>)}</div>}
 
@@ -120,7 +120,7 @@ export default function Intelligence() {
       </section>)}</div>}
 
       {tab === "reviews" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
-        <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.pullRequests.openCount === null ? "Pull request access unavailable" : repo.pullRequests.openCount + " open PRs · " + repo.pullRequests.reviews.length + " reviewed by static heuristics"}</p></div></div>
+        <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.pullRequests.openCount === null ? "Pull request access unavailable" : repo.pullRequests.openCount + " open PRs · " + repo.pullRequests.reviews.length + " PRs analysed"}</p></div></div>
         {!repo.pullRequests.available && <p className="intel-note">GitHub did not expose pull requests to this request.</p>}
         {repo.pullRequests.reviews.map((pr) => <div className="intel-pr-review" key={pr.number}>
           <div className="intel-pr-heading"><div><a href={pr.url} target="_blank" rel="noreferrer">#{pr.number} {pr.title}</a><small>{pr.author} · {pr.branch} → {pr.baseBranch} · updated {ago(pr.updatedAt)}{pr.draft ? " · draft" : ""}</small></div><span>{pr.changedFiles} files</span></div>
@@ -131,7 +131,7 @@ export default function Intelligence() {
       </section>)}</div>}
 
       {tab === "security" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
-        <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.repository.license} · {repo.repository.openIssues} open issues · {repo.maintenance.staleOpenIssues} issues not updated in 90 days</p></div><strong>{repo.security.available ? repo.security.openCount : "N/A"}<small>open alerts</small></strong></div>
+        <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.repository.license} · {repo.repository.openIssues} open issues · {repo.maintenance.staleOpenIssues} issues not updated in 90 days</p></div><strong>{repo.security.available ? repo.security.openCount : "N/A"}<small>alerts returned</small></strong></div>
         <p className="intel-note">{repo.security.note}</p>
         {repo.security.alerts.map((alert) => <div className="intel-alert" key={alert.number}><span className={severityClass(alert.severity)}>{alert.severity}</span><div><a href={alert.url} target="_blank" rel="noreferrer">{alert.packageName}: {alert.summary}</a><small>{alert.manifestPath || "Manifest path unavailable"}{alert.patchedVersion ? " · patched in " + alert.patchedVersion : ""}</small></div><button onClick={() => setPlan({ title: "Dependency remediation plan · " + alert.packageName, steps: safePlan("Dependency alert", "Verify the advisory and affected version range, update to the first patched compatible version, regenerate the lockfile, and run audit, build, and tests.", alert.url) })}>Plan fix</button></div>)}
         {repo.security.available && repo.security.alerts.length === 0 && <p className="intel-note">GitHub returned no open Dependabot alerts for this request. Other scanners or private advisories may not be represented.</p>}
