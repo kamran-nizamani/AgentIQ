@@ -9,6 +9,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "web:dev": "npm --workspace @agentiq/web run dev",
+    "dev": "concurrently -k \"npm run api:dev\" \"npm run web:dev\"",
     "api:dev": "npm --workspace @agentiq/api run dev",
     "api:start": "npm --workspace @agentiq/api run start",
     "api:typecheck": "npm --workspace @agentiq/api run typecheck",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "concurrently": "^9.2.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
