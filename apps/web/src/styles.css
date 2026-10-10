@@ -437,6 +437,7 @@ td small { font-size: 8px; color: #758197; }
 .command-items { max-height: min(48vh, 440px); overflow: auto; padding: 4px 8px 9px; }
 .command-item { display: flex; align-items: center; width: 100%; gap: 11px; padding: 11px 10px; text-align: left; border: 1px solid transparent; border-radius: 10px; color: #8f9bb0; background: transparent; }
 .command-item:hover, .command-item:focus-visible { border-color: rgba(185,243,109,.16); background: rgba(185,243,109,.07); color: #f0f5fd; }
+.command-item.active { border-color: rgba(185,243,109,.24); background: rgba(185,243,109,.09); color: #f0f5fd; }
 .command-item-icon { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.035); }
 .command-item > span:nth-child(2) { flex: 1; min-width: 0; }
 .command-item strong, .command-item small { display: block; }
