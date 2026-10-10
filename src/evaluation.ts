@@ -6,7 +6,8 @@ import { extractRiskSignals, type RiskSignal } from "./risk.js";
 export interface EvaluationPolicy { id:string; outcomeWeight:number; testsWeight:number; efficiencyWeight:number; autonomyWeight:number; safetyWeight:number; }
 export const DEFAULT_POLICY: EvaluationPolicy={id:"default-engineering-v1",outcomeWeight:.35,testsWeight:.30,efficiencyWeight:.15,autonomyWeight:.10,safetyWeight:.10};
 
-export interface EvidenceCoverage { tests:boolean; safety:boolean; availableWeight:number; provisional:boolean; missing:string[]; }\nexport interface EvaluationReport { evaluation:AgentEvaluation; policy:EvaluationPolicy; riskSignals:RiskSignal[]; evidenceIds:string[]; evidenceCoverage:EvidenceCoverage; scoreStatus:"verified"|"provisional"; }
+export interface EvidenceCoverage { tests:boolean; safety:boolean; availableWeight:number; provisional:boolean; missing:string[]; }
+export interface EvaluationReport { evaluation:AgentEvaluation; policy:EvaluationPolicy; riskSignals:RiskSignal[]; evidenceIds:string[]; evidenceCoverage:EvidenceCoverage; scoreStatus:"verified"|"provisional"; }
 
 export function evaluateEvidence(bundle:EvidenceBundle, run:AgentRun, policy:EvaluationPolicy=DEFAULT_POLICY): EvaluationReport {
   const sum=policy.outcomeWeight+policy.testsWeight+policy.efficiencyWeight+policy.autonomyWeight+policy.safetyWeight;
@@ -24,5 +25,8 @@ export function evaluateEvidence(bundle:EvidenceBundle, run:AgentRun, policy:Eva
   const evidenceCoverage:EvidenceCoverage={tests:testsAvailable,safety:safetyAvailable,availableWeight,provisional:missing.length>0,missing};
 
   const grade=score>=90?"A":score>=80?"B":score>=70?"C":score>=60?"D":"F";
-  const recommendations=[...base.recommendations];\n  if(!testsAvailable) recommendations.unshift("Test score is provisional: attach a parsed test report before treating this run as verified.");\n  if(!safetyAvailable) recommendations.unshift("Safety score is provisional: collect code-diff evidence before treating this run as safe.");\n  return {evaluation:{...base,score,grade,recommendations},policy,riskSignals:extractRiskSignals(bundle),evidenceIds:bundle.evidence.map(e=>e.id),evidenceCoverage,scoreStatus:evidenceCoverage.provisional?"provisional":"verified"};
+  const recommendations=[...base.recommendations];
+  if(!testsAvailable) recommendations.unshift("Test score is provisional: attach a parsed test report before treating this run as verified.");
+  if(!safetyAvailable) recommendations.unshift("Safety score is provisional: collect code-diff evidence before treating this run as safe.");
+  return {evaluation:{...base,score,grade,recommendations},policy,riskSignals:extractRiskSignals(bundle),evidenceIds:bundle.evidence.map(e=>e.id),evidenceCoverage,scoreStatus:evidenceCoverage.provisional?"provisional":"verified"};
 }
