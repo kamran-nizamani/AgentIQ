@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 type IconName = "grid" | "activity" | "git" | "bar" | "shield" | "settings" | "search" | "bell" | "plus" | "arrow" | "check" | "clock" | "alert" | "trend" | "chevron" | "spark" | "menu" | "refresh" | "close" | "external";
 const iconPaths: Record<IconName, string> = {
@@ -288,7 +288,7 @@ function App() {
     { label: "Clear search", detail: "Reset the global search filter", action: () => { setQuery(""); setCommandOpen(false); } },
   ].filter((item) => (item.label + " " + item.detail).toLowerCase().includes(commandQuery.toLowerCase()));
 
-  async function inspectRepository(event: React.FormEvent<HTMLFormElement>) {
+  async function inspectRepository(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = repositoryInput.trim();
     if (!value) { setRepositoryInspectError("Paste a GitHub repository URL first."); return; }
