@@ -361,7 +361,10 @@ function App() {
           <section className="panel runs-panel"><PanelHeading title="Recent workflow evaluations" subtitle="Real GitHub Actions runs, refreshed from the configured repository" action={<button className="text-button" onClick={() => navigate("Runs")}>View all <Icon name="arrow" size={15} /></button>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} compact /></section>
         </>}
 
-        {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="runs-toolbar"><button className="secondary-button export-button" onClick={exportRuns} disabled={visibleRuns.length === 0}><Icon name="arrow" size={14} /> Export CSV</button><div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
+        {active === "Runs" && <div className="runs-page">
+          <RepositoryRuns repository={inspectedRepository?.repository.fullName || meta?.repository || "kamran-nizamani/AgentIQ"} />
+          <section className="panel runs-panel"><PanelHeading title="AgentIQ evaluation records" subtitle={"Evaluation evidence from the configured AgentIQ source: " + (meta?.repository || "connecting")} action={<div className="runs-toolbar"><button className="secondary-button export-button" onClick={exportRuns} disabled={visibleRuns.length === 0}><Icon name="arrow" size={14} /> Export CSV</button><div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>
+        </div>}
 
 
         {active === "Intelligence" && <Intelligence />}
