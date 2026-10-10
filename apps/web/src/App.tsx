@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import Intelligence from "./Intelligence";
 
 type IconName = "grid" | "activity" | "git" | "bar" | "shield" | "settings" | "search" | "bell" | "plus" | "arrow" | "check" | "clock" | "alert" | "trend" | "chevron" | "spark" | "menu" | "refresh" | "close" | "external";
 const iconPaths: Record<IconName, string> = {
@@ -31,6 +32,7 @@ const navigation = [
   { label: "Overview", icon: "grid" as const },
   { label: "Runs", icon: "activity" as const },
   { label: "Repositories", icon: "git" as const },
+  { label: "Intelligence", icon: "spark" as const },
   { label: "Benchmarks", icon: "bar" as const },
   { label: "Audit & Safety", icon: "shield" as const },
   { label: "Settings", icon: "settings" as const },
@@ -309,7 +311,7 @@ function App() {
     <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
       <div className="brand"><div className="brand-mark"><Icon name="spark" size={17} /></div><div><strong>AgentIQ</strong><span>Evidence-driven evaluation</span></div></div>
       <div className="workspace"><span className="workspace-dot" /><div><small>Data source</small><strong>{meta?.repository || "Connecting to GitHub…"}</strong></div><Icon name="chevron" size={15} /></div>
-      <nav className="nav-list"><p className="nav-label">Monitor</p>{navigation.slice(0, 5).map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span>{item.label === "Runs" && <em>{totalRuns}</em>}</button>)}<p className="nav-label nav-label-spaced">System</p>{navigation.slice(5).map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
+      <nav className="nav-list"><p className="nav-label">Monitor</p>{navigation.filter((item) => item.label !== "Settings").map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span>{item.label === "Runs" && <em>{totalRuns}</em>}</button>)}<p className="nav-label nav-label-spaced">System</p>{navigation.filter((item) => item.label === "Settings").map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-footer"><div className="status-line"><span className="pulse" /> {runsError ? "Data source needs attention" : loadingRuns ? "Connecting to live data" : "GitHub API connected"}</div><div className="user-card"><div className="avatar">K</div><div><strong>Workspace owner</strong><span>Developer</span></div><Icon name="chevron" size={15} /></div></div>
     </aside>
 
@@ -360,6 +362,8 @@ function App() {
 
         {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="runs-toolbar"><button className="secondary-button export-button" onClick={exportRuns} disabled={visibleRuns.length === 0}><Icon name="arrow" size={14} /> Export CSV</button><div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
 
+
+        {active === "Intelligence" && <Intelligence />}
 
         {active === "Repositories" && <section className="repository-inspector-page">
           <section className="panel inspector-search-panel">
