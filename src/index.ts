@@ -24,8 +24,5 @@ export { GitHubApiCollector, GitHubApiError, createGitHubApiCollector } from "./
 export type { GitHubWorkflowRunSnapshot, GitHubWorkflowJobSnapshot, GitHubReviewSnapshot, GitHubCommentSnapshot } from "./github-ci.js";
 export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnapshot, ingestCommentSnapshot } from "./github-ci.js";
 
-export type { GitHubWorkflowRunSnapshot, GitHubWorkflowJobSnapshot, GitHubReviewSnapshot, GitHubCommentSnapshot } from "./github-ci.js";
-export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnapshot, ingestCommentSnapshot } from "./github-ci.js";
-
 export type { StoredAgentRun, AgentRunStore, RunHistoryQuery, RunHistoryRow } from "./storage.js";
 export { InMemoryAgentRunStore, toRunHistoryRow } from "./storage.js";
