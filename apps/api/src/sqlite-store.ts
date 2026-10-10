@@ -5,7 +5,7 @@ import type { AgentRunStore, RunHistoryQuery, StoredAgentRun } from "../../../sr
 
 const clone = <T>(value: T): T => structuredClone(value);
 const sameEvidence = (left: StoredAgentRun, right: StoredAgentRun): boolean => {
-  const canonical = (record: StoredAgentRun) => ({ ...record.evidence, evidence: record.evidence.evidence.map((item) => ({ ...item, provenance: { ...item.provenance, collectedAt: "" } })) });
+  const canonical = (record: StoredAgentRun) => ({ ...record.evidence, evidence: record.evidence.evidence.map((item) => ({ ...item, timestamp: "", provenance: { ...item.provenance, collectedAt: "" } })) });
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 };
 const repositoryOf = (record: StoredAgentRun): string | null => {
