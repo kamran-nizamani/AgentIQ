@@ -278,5 +278,25 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
   await collectCommitEvidence(repository, raw, normalized.evidence);
+  const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);
+  refreshedRun.id = String(raw.id);
+  refreshedRun.taskOutcome = normalizeOutcome(raw.conclusion);
+  if (raw.status !== "completed") {
+    refreshedRun.execution.durationMs = Math.max(0, Date.now() - Date.parse(raw.run_started_at || raw.created_at));
+  }
+  const refreshedEvaluation = evaluateEvidence(normalized.evidence, refreshedRun);
+  normalized.score = refreshedEvaluation.evaluation.score;
+  normalized.grade = refreshedEvaluation.evaluation.grade;
+  normalized.evidenceCount = normalized.evidence.evidence.length;
+  normalized.riskCount = refreshedEvaluation.riskSignals.length;
+  normalized.durationMs = refreshedRun.execution.durationMs;
+  normalized.changes = refreshedRun.changes;
+  normalized.breakdown = refreshedEvaluation.evaluation.breakdown;
+  normalized.recommendations = refreshedEvaluation.evaluation.recommendations;
+  normalized.evidenceKinds = normalized.evidence.evidence.map((item) => item.kind);
+  normalized.testEvidenceAvailable = normalized.evidence.evidence.some((item) => item.kind === "test-suite");
+  normalized.diffEvidenceAvailable = normalized.evidence.evidence.some((item) => item.kind === "diff");
+  normalized.riskAssessment = normalized.diffEvidenceAvailable ? "assessed" : "not-assessed";
+  normalized.evaluation = refreshedEvaluation;
   return { ...normalized, jobs: jobsPayload.jobs };
 }
