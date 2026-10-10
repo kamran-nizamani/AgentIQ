@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
-import { createApiHandler } from "./server.js";
+import { createApiHandler, createDemoStore } from "./server.js";
 
 describe("AgentIQ HTTP API", () => {
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    server = createServer(createApiHandler());
+    server = createServer(createApiHandler(createDemoStore()));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Test server did not bind to a TCP port.");
@@ -30,7 +30,7 @@ describe("AgentIQ HTTP API", () => {
     expect(response.status).toBe(200);
     expect(body.data).toHaveLength(2);
     expect(body.pagination).toMatchObject({ total: 3, limit: 2, offset: 0, hasMore: true });
-    expect(body.meta.mode).toBe("demo");
+    expect(body.meta.mode).toBe("in-memory-demo");
     expect(body.data[0]).toHaveProperty("score");
     expect(body.data[0]).toHaveProperty("agent");
   });
