@@ -11,7 +11,7 @@ npm run dev
 
 Frontend: `http://localhost:5173`; API: `http://127.0.0.1:8787`.
 
-SQLite data defaults to `./data/agentiq.sqlite`. Set `AGENTIQ_DB_PATH` to change the path. The API creates the parent directory if needed.
+SQLite data defaults to `./data/agentiq.sqlite`. Set `AGENTIQ_DB_PATH` to change the path.
 
 ## Endpoints
 
@@ -31,7 +31,7 @@ Set these environment variables before starting the API:
 - `AGENTIQ_DB_PATH=./data/agentiq.sqlite` (optional)
 - `AGENTIQ_DEMO=false` (optional; prevents demo rows being seeded into an empty database)
 
-Then run:
+Then call:
 
 ```bash
 curl -X POST http://127.0.0.1:8787/api/ingest/github \
