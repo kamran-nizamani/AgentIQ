@@ -227,7 +227,7 @@ function classifySensitivePath(path: string): "critical" | "high" | null {
   const normalized = path.replaceAll("\\\\", "/").toLowerCase();
   const parts = normalized.split("/");
   const basename = parts[parts.length - 1] || normalized;
-  if ((basename.startsWith(".env") && basename !== ".env.example" && basename !== ".env.sample") ||
+  if ((basename.startsWith(".env") && !basename.endsWith(".example") && !basename.endsWith(".sample")) ||
       basename === "id_rsa" || basename === "id_ed25519" ||
       basename.includes("private-key") || basename.includes("private_key") ||
       ((basename.includes("secret") || basename.includes("credential")) &&
@@ -250,7 +250,7 @@ async function attachCommitDiff(repository: string, raw: GitHubRunApi, evidence:
     const diffEvidence = ingestGitDiffEvidence({
       baseCommit: commit.parents?.[0]?.sha || raw.head_sha,
       headCommit: raw.head_sha,
-      filesChanged: commit.stats?.total ?? files.length,
+      filesChanged: files.length,
       linesAdded: commit.stats?.additions ?? files.reduce((sum, file) => sum + (file.additions || 0), 0),
       linesDeleted: commit.stats?.deletions ?? files.reduce((sum, file) => sum + (file.deletions || 0), 0),
       sourceId: "github-commit:" + raw.head_sha,
@@ -264,7 +264,7 @@ async function attachCommitDiff(repository: string, raw: GitHubRunApi, evidence:
     }));
     diffEvidence.data.sensitiveFiles = sensitiveFiles;
     diffEvidence.data.dependencyFiles = dependencyFiles;
-    diffEvidence.data.fileListTruncated = (commit.stats?.total ?? files.length) > files.length;
+    diffEvidence.data.fileListTruncated = files.length >= 300;
     evidence.evidence.push(diffEvidence);
   } catch {
     // Keep run details usable when commit-level permissions or GitHub API limits prevent diff retrieval.
