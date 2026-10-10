@@ -1,4 +1,5 @@
-import { createEvidenceBundle, ingestGitDiffEvidence } from "../src/ingestion.js";
+import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
+import { parseTestLogSummary } from "../src/test-log.js";
 import { evaluateEvidence } from "../src/evaluation.js";
 import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot, type GitHubWorkflowJobSnapshot, type GitHubWorkflowRunSnapshot } from "../src/github-ci.js";
 import { evidenceBundleToAgentRun } from "../src/normalize.js";
@@ -106,6 +107,44 @@ async function githubGet<T>(path: string): Promise<T> {
     throw new GitHubLiveError("GitHub Actions API returned HTTP " + response.status + ".", 502);
   }
   return await response.json() as T;
+}
+
+async function githubGetText(path: string): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "AgentIQ",
+  };
+  if (token) headers.Authorization = "Bearer " + token;
+  const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store", redirect: "follow" });
+  if (!response.ok) throw new GitHubLiveError("GitHub job logs are unavailable (HTTP " + response.status + ").", 502);
+  // Test summaries are conventionally near the end; cap retained text to keep function memory bounded.
+  return (await response.text()).slice(-2_000_000);
+}
+
+async function collectTestEvidence(repository: string, jobs: GitHubJobApi[], evidence: EvidenceBundle): Promise<void> {
+  const candidates = jobs.filter((job) => job.status === "completed" && /test|ci/i.test(job.name)).slice(0, 8);
+  const summaries = await Promise.all(candidates.map(async (job) => {
+    try {
+      const log = await githubGetText("/repos/" + repository + "/actions/jobs/" + job.id + "/logs");
+      const summary = parseTestLogSummary(log);
+      if (!summary || summary.total <= 0) return null;
+      return ingestTestEvidence({
+        framework: summary.framework,
+        total: summary.total,
+        passed: summary.passed,
+        failed: summary.failed,
+        skipped: summary.skipped,
+        durationMs: summary.durationMs,
+        sourceId: "github-job-log:" + job.id,
+      });
+    } catch {
+      // A missing or inaccessible log is not test evidence.
+      return null;
+    }
+  }));
+  for (const summary of summaries) if (summary) evidence.evidence.push(summary);
 }
 
 function toWorkflowSnapshot(raw: GitHubRunApi): GitHubWorkflowRunSnapshot {
@@ -217,7 +256,7 @@ export async function listLiveRuns(options: { limit: number; offset: number }): 
       repository,
       authenticated: Boolean(process.env.GITHUB_TOKEN),
       generatedAt: new Date().toISOString(),
-      note: "Workflow metadata is live; opening a run fetches its jobs and steps. Test counts and code-diff risk remain unassessed until dedicated test-report and diff evidence is connected.",
+      note: "The run list is lightweight workflow metadata; opening a run attempts to parse explicit test summaries from job logs and collect commit-level diff evidence. Unavailable evidence remains unassessed.",
     },
   };
 }
@@ -277,6 +316,7 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   const raw = await githubGet<GitHubRunApi>("/repos/" + repository + "/actions/runs/" + runId);
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
+  await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
   await collectCommitEvidence(repository, raw, normalized.evidence);
   const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);
   refreshedRun.id = String(raw.id);
