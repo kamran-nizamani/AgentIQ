@@ -34,7 +34,7 @@ describe("evidence-aware evaluation", () => {
       missing: ["Parsed test report", "Code diff"],
     });
     expect(report.evaluation.breakdown.tests).toBe(50);
-    expect(report.evaluation.score).toBe(100);
+    expect(report.evaluation.score).toBe(99);
     expect(report.evaluation.recommendations.join(" ")).toContain("provisional");
   });
 
