@@ -1,4 +1,4 @@
-import { createEvidenceBundle } from "../src/ingestion.js";
+import { createEvidenceBundle, ingestGitDiffEvidence } from "../src/ingestion.js";
 import { evaluateEvidence } from "../src/evaluation.js";
 import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot, type GitHubWorkflowJobSnapshot, type GitHubWorkflowRunSnapshot } from "../src/github-ci.js";
 import { evidenceBundleToAgentRun } from "../src/normalize.js";
@@ -35,6 +35,12 @@ type GitHubJobApi = {
 
 type GitHubRunsResponse = { total_count: number; workflow_runs: GitHubRunApi[] };
 type GitHubJobsResponse = { total_count: number; jobs: GitHubJobApi[] };
+type GitHubCommitApi = {
+  sha: string;
+  parents?: Array<{ sha: string }>;
+  stats?: { total?: number; additions?: number; deletions?: number };
+  files?: Array<{ filename: string; status: string; additions: number; deletions: number; changes: number; patch?: string }>;
+};
 
 export type LiveRunRecord = {
   runId: string;
@@ -151,6 +157,7 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
   workflow.data.completedAt = raw.status === "completed" ? raw.updated_at : null;
   const jobEvidence = jobs.map((job) => ingestWorkflowJobSnapshot(repository, raw.id, toJobSnapshot(job)));
   const evidence = createEvidenceBundle([workflow, ...jobEvidence]);
+  await attachCommitDiff(repository, raw, evidence);
   const run = evidenceBundleToAgentRun(evidence);
   run.id = String(raw.id);
   run.taskOutcome = normalizeOutcome(raw.conclusion);
@@ -214,6 +221,48 @@ export async function listLiveRuns(options: { limit: number; offset: number }): 
       note: "Workflow metadata is live; opening a run fetches its jobs and steps. Test counts and code-diff risk remain unassessed until dedicated test-report and diff evidence is connected.",
     },
   };
+}
+
+function classifySensitivePath(path: string): "critical" | "high" | null {
+  const normalized = path.replace(/\\\\/g, "/").toLowerCase();
+  if (/(^|\\/)(\\.env(\\..*)?|id_rsa|id_ed25519|[^/]*private[-_]?key[^/]*|secrets?\\.(json|ya?ml|toml)|credentials?\\.(json|ya?ml|toml))$/.test(normalized) && !normalized.endsWith(".example")) return "critical";
+  if (/(^|\\/)(\\.github\\/workflows|auth|authorization|security|crypto|cryptography|deploy|terraform|k8s|kubernetes)(\\/|$)/.test(normalized) ||
+      /(^|\\/)(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|requirements[^/]*\\.txt|pyproject\\.toml|poetry\\.lock|cargo\\.toml|go\\.mod|go\\.sum)$/.test(normalized)) return "high";
+  return null;
+}
+
+async function attachCommitDiff(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<void> {
+  if (!raw.head_sha || !/^[a-f0-9]{7,40}$/i.test(raw.head_sha)) return;
+  try {
+    const commit = await githubGet<GitHubCommitApi>("/repos/" + repository + "/commits/" + raw.head_sha);
+    const files = Array.isArray(commit.files) ? commit.files : [];
+    const sensitiveFiles = files
+      .map((file) => ({ path: file.filename, severity: classifySensitivePath(file.filename) }))
+      .filter((file): file is { path: string; severity: "critical" | "high" } => file.severity !== null);
+    const dependencyFiles = files.filter((file) => /(^|\\/)(package\\.json|package-lock\\.json|pnpm-lock\\.yaml|yarn\\.lock|requirements[^/]*\\.txt|pyproject\\.toml|poetry\\.lock|cargo\\.toml|go\\.mod|go\\.sum)$/.test(file.filename.toLowerCase())).map((file) => file.filename);
+    const diffEvidence = ingestGitDiffEvidence({
+      baseCommit: commit.parents?.[0]?.sha || raw.head_sha,
+      headCommit: raw.head_sha,
+      filesChanged: commit.stats?.total ?? files.length,
+      linesAdded: commit.stats?.additions ?? files.reduce((sum, file) => sum + (file.additions || 0), 0),
+      linesDeleted: commit.stats?.deletions ?? files.reduce((sum, file) => sum + (file.deletions || 0), 0),
+      sourceId: "github-commit:" + raw.head_sha,
+    });
+    diffEvidence.data.changedFiles = files.map((file) => ({
+      path: file.filename,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes,
+    }));
+    diffEvidence.data.sensitiveFiles = sensitiveFiles;
+    diffEvidence.data.dependencyFiles = dependencyFiles;
+    diffEvidence.data.fileListTruncated = (commit.stats?.total ?? files.length) > files.length;
+    evidence.evidence.push(diffEvidence);
+  } catch {
+    // Keep run details usable when commit-level permissions or GitHub API limits prevent diff retrieval.
+    // Missing diff evidence remains explicitly unassessed.
+  }
 }
 
 export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evidence: EvidenceBundle; evaluation: ReturnType<typeof evaluateEvidence>; jobs: GitHubJobApi[] }> {
