@@ -243,8 +243,8 @@ function App() {
   const exportRuns = () => {
     const columns: Array<keyof RunRow> = ["runId", "repository", "workflow", "branch", "score", "grade", "outcome", "durationMs", "storedAt"];
     const escapeCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
-    const csv = [columns.join(","), ...visibleRuns.map((run) => columns.map((key) => escapeCell(run[key])).join(","))].join("\\r\\n");
-    const url = URL.createObjectURL(new Blob(["\\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
+    const csv = [columns.join(","), ...visibleRuns.map((run) => columns.map((key) => escapeCell(run[key])).join(","))].join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = "agentiq-runs-" + new Date().toISOString().slice(0, 10) + ".csv";
