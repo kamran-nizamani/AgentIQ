@@ -30,6 +30,8 @@ const summary = {
   testEvidenceAvailable: true,
   diffEvidenceAvailable: false,
   riskAssessment: "not-assessed",
+  scoreStatus: "provisional",
+  evidenceCoverage: { tests: true, safety: false, availableWeight: 0.9, provisional: true, missing: ["Code diff"] },
 } as LiveRunRecord;
 
 afterEach(() => {
