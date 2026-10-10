@@ -74,19 +74,16 @@ function createDefaultStore(): AgentRunStore {
   if (process.env.AGENTIQ_DEMO !== "false") {
     void store.count().then((count) => {
       if (count === 0) {
-        for (const record of createDemoStoreRecords()) void store.save(record);
+        void createDemoStoreRecords().then((records) => Promise.all(records.map((record) => store.save(record))));
       }
     });
   }
   return store;
 }
 
-function createDemoStoreRecords(): StoredAgentRun[] {
-  const store = createDemoStore();
-  // The in-memory store is used only to materialize starter records for a fresh local database.
-  return (store as unknown as { records: Map<string, StoredAgentRun> }).records
-    ? [...(store as unknown as { records: Map<string, StoredAgentRun> }).records.values()]
-    : [];
+async function createDemoStoreRecords(): Promise<StoredAgentRun[]> {
+  // Materialize starter rows through the public store contract rather than its internals.
+  return createDemoStore().list({ limit: 10 });
 }
 
 async function collectGitHubRuns(store: AgentRunStore): Promise<{ collected: number; repository: string }> {
