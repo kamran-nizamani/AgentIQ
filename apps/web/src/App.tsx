@@ -145,6 +145,8 @@ function App() {
   const [selectedRun, setSelectedRun] = useState<RunDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -236,8 +238,38 @@ function App() {
     })).sort((a, b) => b.count - a.count);
   }, [visibleRuns]);
 
-  const navigate = (label: string) => { setActive(label); setSidebarOpen(false); setSelectedRunId(null); };
+  const navigate = (label: string) => { setActive(label); setSidebarOpen(false); setSelectedRunId(null); setCommandOpen(false); setCommandQuery(""); };
   const refresh = () => setRefreshKey((value) => value + 1);
+  const exportRuns = () => {
+    const columns: Array<keyof RunRow> = ["runId", "repository", "workflow", "branch", "score", "grade", "outcome", "durationMs", "storedAt"];
+    const escapeCell = (value: unknown) => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+    const csv = [columns.join(","), ...visibleRuns.map((run) => columns.map((key) => escapeCell(run[key])).join(","))].join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "agentiq-runs-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+      }
+      if (event.key === "Escape") setCommandOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  const commandItems = [
+    ...navigation.map((item) => ({ label: "Go to " + item.label, detail: "Navigate workspace", action: () => navigate(item.label) })),
+    { label: "Refresh live data", detail: "Fetch latest GitHub Actions runs", action: () => { refresh(); setCommandOpen(false); } },
+    { label: "Export filtered runs", detail: "Download visible runs as CSV", action: () => { exportRuns(); setCommandOpen(false); } },
+    { label: "Clear search", detail: "Reset the global search filter", action: () => { setQuery(""); setCommandOpen(false); } },
+  ].filter((item) => (item.label + " " + item.detail).toLowerCase().includes(commandQuery.toLowerCase()));
 
   return <div className="app-shell">
     <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
@@ -248,10 +280,19 @@ function App() {
     </aside>
 
     <main className="main">
-      <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu" /></button><div className="breadcrumbs"><span>AgentIQ</span><b>/</b><strong>{active}</strong></div><div className="top-actions"><label className="search-box"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search workflows, branches…" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="Refresh live data" title="Refresh live data" onClick={refresh}><Icon name="refresh" size={17} /></button><button className="primary-button" onClick={refresh} disabled={loadingRuns}><Icon name="refresh" size={16} /> Refresh data</button></div></header>
+      <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu" /></button><div className="breadcrumbs"><span>AgentIQ</span><b>/</b><strong>{active}</strong></div><div className="top-actions"><label className="search-box"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search workflows, branches…" /><kbd onClick={() => setCommandOpen(true)} title="Open command menu">⌘ K</kbd></label><button className="icon-button" aria-label="Refresh live data" title="Refresh live data" onClick={refresh}><Icon name="refresh" size={17} /></button><button className="primary-button" onClick={refresh} disabled={loadingRuns}><Icon name="refresh" size={16} /> Refresh data</button></div></header>
 
+      {commandOpen && <div className="command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false); }}>
+        <section className="command-dialog" role="dialog" aria-modal="true" aria-label="Command menu">
+          <div className="command-search"><Icon name="search" size={18} /><input autoFocus value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="Type a command or navigate…" /><kbd>ESC</kbd></div>
+          <p className="command-label">QUICK ACTIONS</p>
+          <div className="command-items">{commandItems.map((item) => <button key={item.label} className="command-item" onClick={item.action}><span className="command-item-icon"><Icon name={item.label.startsWith("Go to") ? "grid" : item.label.startsWith("Refresh") ? "refresh" : item.label.startsWith("Export") ? "arrow" : "close"} size={16} /></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><Icon name="arrow" size={15} /></button>)}
+          {commandItems.length === 0 && <EmptyState title="No matching commands" description="Try a page name, refresh, export, or clear search." />}</div>
+          <div className="command-footer"><span>Navigate your workspace faster</span><span><kbd>↵</kbd> Select <kbd>esc</kbd> Close</span></div>
+        </section>
+      </div>}
       <div className="content">
-        <section className="hero"><div><p className="eyebrow"><span className="live-dot" /> {loadingRuns ? "Loading GitHub Actions evidence" : runsError ? "Live source unavailable" : "Live GitHub Actions data"}</p><h1>{active === "Overview" ? "Engineering evidence, not guesswork." : active}</h1><p className="hero-copy">{active === "Overview" ? "Evaluate real workflow outcomes and inspect the evidence behind every score." : "This view is calculated from the live workflow data currently available to AgentIQ."}</p></div><div className="hero-actions"><button className="secondary-button" onClick={() => navigate("Audit & Safety")}>Evidence coverage <Icon name="arrow" size={16} /></button></div></section>
+        <section className="hero"><div><p className="eyebrow"><span className={"live-dot" + (runsError ? " is-error" : "")} /> {loadingRuns ? "Syncing GitHub Actions evidence" : runsError ? "Live source unavailable" : "Live GitHub Actions data"}</p><h1>{active === "Overview" ? "Engineering evidence, not guesswork." : active}</h1><p className="hero-copy">{active === "Overview" ? "Evaluate real workflow outcomes and inspect the evidence behind every score." : "This view is calculated from the live workflow data currently available to AgentIQ."}</p></div><div className="hero-actions"><button className="secondary-button" onClick={() => navigate("Audit & Safety")}>Evidence coverage <Icon name="arrow" size={16} /></button></div></section>
 
         {selectedRunId && <section className="panel detail-panel">
           <PanelHeading title={selectedRun ? "Workflow run #" + selectedRun.runNumber : "Workflow run details"} subtitle={selectedRun ? selectedRun.workflow + " · " + selectedRun.repository : "Fetching run metadata, jobs, and step evidence"} action={<button className="more-button" aria-label="Close run details" onClick={() => setSelectedRunId(null)}><Icon name="close" size={16} /></button>} />
@@ -283,7 +324,7 @@ function App() {
           <section className="panel runs-panel"><PanelHeading title="Recent workflow evaluations" subtitle="Real GitHub Actions runs, refreshed from the configured repository" action={<button className="text-button" onClick={() => navigate("Runs")}>View all <Icon name="arrow" size={15} /></button>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} compact /></section>
         </>}
 
-        {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
+        {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="runs-toolbar"><button className="secondary-button export-button" onClick={exportRuns} disabled={visibleRuns.length === 0}><Icon name="arrow" size={14} /> Export CSV</button><div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
 
         {active === "Repositories" && <section className="panel"><PanelHeading title="Connected repository" subtitle="The production API reads Actions history from this configured repository." /><div className="repository-card"><div className="repo-icon large"><Icon name="git" size={22} /></div><div className="repository-main"><strong>{meta?.repository || health?.repository || "Repository configuration unavailable"}</strong><span>{health?.status === "ok" ? "API healthy" : "Health status unavailable"} · {meta?.authenticated ? "Authenticated GitHub API" : "Public GitHub API"}</span><p>Latest branch: {visibleRuns[0]?.branch || "No branch evidence"} · {totalRuns} total workflow runs</p></div><a className="secondary-button" href={"https://github.com/" + (meta?.repository || health?.repository || "kamran-nizamani/AgentIQ")} target="_blank" rel="noreferrer">Open repository <Icon name="external" size={14} /></a></div><div className="detail-grid"><div><small>Workflows observed</small><strong>{workflows.length}</strong></div><div><small>Runs in current range</small><strong>{visibleRuns.length}</strong></div><div><small>Test evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.testEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div><div><small>Diff evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.diffEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div></div><p className="evidence-note"><Icon name="alert" size={15} /> Repository selection is environment-configured in this release. To connect another repository, set AGENTIQ_GITHUB_REPOSITORY in Vercel project settings; use a least-privilege GITHUB_TOKEN for private repositories.</p></section>}
 
