@@ -99,6 +99,8 @@ async function collectGitHubRuns(store: AgentRunStore): Promise<{ collected: num
   for (const workflow of workflows) {
     const workflowEvidence = ingestWorkflowRunSnapshot(repository, workflow);
     workflowEvidence.provenance.sourceId = repository + "#" + workflow.id;
+    workflowEvidence.data.startedAt = workflow.createdAt;
+    workflowEvidence.data.completedAt = workflow.status === "completed" ? workflow.updatedAt : null;
     const jobs = await collector.workflowJobs(workflow.id, 100);
     const evidence = createEvidenceBundle([
       workflowEvidence,
