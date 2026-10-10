@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type IconName = "grid" | "activity" | "git" | "bar" | "shield" | "settings" | "search" | "bell" | "plus" | "arrow" | "check" | "clock" | "alert" | "trend" | "chevron" | "spark" | "menu" | "refresh" | "close" | "external";
 const iconPaths: Record<IconName, string> = {
@@ -118,7 +118,7 @@ function Status({ status }: { status: string }) {
   const cls = status === "Success" ? "success" : status === "Partial" || status === "In progress" ? "partial" : "failed";
   return <span className={"status " + cls}><i />{status}</span>;
 }
-function PanelHeading({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) {
+function PanelHeading({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
   return <div className="panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div>{action}</div>;
 }
 function EmptyState({ title, description }: { title: string; description: string }) {
