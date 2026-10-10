@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type RunRow = {
   id: number; name: string; title: string; url: string; workflowUrl: string | null;
@@ -103,7 +103,7 @@ export default function RepositoryRuns({ repository }: { repository: string }) {
     return () => controller.abort();
   }, [repository, selectedId]);
 
-  function applyBranch(event: React.FormEvent<HTMLFormElement>) {
+  function applyBranch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setPage(1); setBranchFilter(branch.trim());
   }
 
