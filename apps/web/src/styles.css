@@ -202,3 +202,55 @@ td small { color: #4f5664; display: block; font-size: 7px; margin-top: 3px; }
   .hero { margin-bottom: 22px; }
   .panel { padding: 15px; }
 }
+
+
+/* Live-data views and evidence detail */
+button:disabled { opacity: .55; cursor: wait; }
+.empty strong { display: block; color: #c6cbd5; font-size: 12px; margin-bottom: 5px; }
+.empty p { margin: 0; color: #6c7381; font-size: 10px; line-height: 1.6; }
+.detail-panel { margin-bottom: 14px; }
+.detail-body { padding-top: 18px; }
+.detail-summary { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.018); margin-bottom: 15px; }
+.detail-summary > div:last-child > strong, .detail-summary > div:last-child > span { display: block; }
+.detail-summary > div:last-child > strong { font: 600 14px "Space Grotesk"; }
+.detail-summary > div:last-child > span { color: #828a99; font-size: 10px; margin-top: 7px; }
+.detail-summary p { color: #9aa1af; font-size: 11px; margin: 9px 0; }
+.detail-summary a { color: #a9d66d; display: inline-flex; align-items: center; gap: 6px; font-size: 10px; text-decoration: none; }
+.detail-summary a:hover { text-decoration: underline; }
+.detail-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin: 14px 0 20px; }
+.detail-grid > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.detail-grid small, .detail-grid strong { display: block; }
+.detail-grid small { color: #626a79; font-size: 9px; margin-bottom: 6px; }
+.detail-grid strong { color: #cbd0da; font-size: 11px; overflow-wrap: anywhere; }
+.detail-section-title { margin: 20px 0 9px; font: 600 12px "Space Grotesk"; }
+.evidence-note { display: flex; align-items: flex-start; gap: 9px; padding: 11px 12px; border: 1px solid rgba(243,199,107,.18); border-radius: 8px; color: #b9a36f; background: rgba(243,199,107,.045); font-size: 10px; line-height: 1.6; margin: 13px 0; }
+.evidence-note svg { flex: 0 0 auto; margin-top: 1px; }
+.evidence-list { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.evidence-list > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.evidence-list > div:last-child { border-bottom: 0; }
+.evidence-list span { color: #b9c0cc; font-size: 10px; overflow-wrap: anywhere; }
+.evidence-list small { color: #666e7d; font-size: 9px; text-align: right; overflow-wrap: anywhere; }
+.recommendations { color: #9ca4b2; font-size: 10px; line-height: 1.8; padding-left: 18px; }
+.repository-card { display: flex; align-items: center; gap: 13px; padding: 16px 0; }
+.repo-icon.large { width: 44px; height: 44px; flex: 0 0 auto; }
+.repository-main { min-width: 0; flex: 1; }
+.repository-main strong, .repository-main span { display: block; }
+.repository-main strong { color: #d7dce5; font: 600 13px "Space Grotesk"; overflow-wrap: anywhere; }
+.repository-main span { color: #7e8796; font-size: 10px; margin-top: 5px; }
+.repository-main p { color: #606877; font-size: 10px; margin: 7px 0 0; }
+.settings-panel { max-width: 100%; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.settings-row > div { min-width: 0; }
+.settings-row strong { color: #c7cdd7; font-size: 11px; }
+.settings-row p { color: #6e7685; font-size: 10px; line-height: 1.6; margin: 5px 0 0; overflow-wrap: anywhere; }
+.settings-row > span { color: #a9d66d; font-size: 10px; text-align: right; overflow-wrap: anywhere; }
+.settings-actions { display: flex; justify-content: flex-end; padding-top: 16px; }
+@media (max-width: 760px) {
+  .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .repository-card { align-items: flex-start; flex-wrap: wrap; }
+  .repository-card .secondary-button { margin-left: 57px; }
+  .settings-row { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .settings-row > span { text-align: left; }
+  .evidence-list > div { flex-direction: column; gap: 5px; }
+  .evidence-list small { text-align: left; }
+}

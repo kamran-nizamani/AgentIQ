@@ -1,11 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-type IconName =
-  | "grid" | "activity" | "git" | "bar" | "shield" | "settings"
-  | "search" | "bell" | "plus" | "arrow" | "check" | "clock"
-  | "alert" | "trend" | "chevron" | "spark" | "menu";
-
-const icons: Record<IconName, string> = {
+type IconName = "grid" | "activity" | "git" | "bar" | "shield" | "settings" | "search" | "bell" | "plus" | "arrow" | "check" | "clock" | "alert" | "trend" | "chevron" | "spark" | "menu" | "refresh" | "close" | "external";
+const iconPaths: Record<IconName, string> = {
   grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
   activity: "M3 12h4l2-7 4 14 2-7h6",
   git: "M7 7v10m0-10a3 3 0 1 0-6 0 3 3 0 0 0 6 0Zm10 10V7m0 10a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM7 7h10",
@@ -23,85 +19,114 @@ const icons: Record<IconName, string> = {
   chevron: "m8 10 4 4 4-4",
   spark: "M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3Z",
   menu: "M4 7h16M4 12h16M4 17h16",
+  refresh: "M20 7v5h-5M4 17v-5h5m-3.2-3A7 7 0 0 1 18.5 7L20 12M4 12l1.5 5A7 7 0 0 0 18.2 15",
+  close: "M18 6 6 18M6 6l12 12",
+  external: "M14 3h7v7m0-7L10 14M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6",
 };
-
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={icons[name]} />
-    </svg>
-  );
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={iconPaths[name]} /></svg>;
 }
 
-const nav = [
+const navigation = [
   { label: "Overview", icon: "grid" as const },
   { label: "Runs", icon: "activity" as const },
   { label: "Repositories", icon: "git" as const },
   { label: "Benchmarks", icon: "bar" as const },
   { label: "Audit & Safety", icon: "shield" as const },
+  { label: "Settings", icon: "settings" as const },
 ];
 
-type DashboardRun = { id: string; repo: string; agent: string; task: string; score: number; status: string; time: string; ago: string };
-
-type RunsResponse = {
-  data: Array<{
-    runId: string;
-    repository: string | null;
-    score: number;
-    outcome: "success" | "partial" | "failure";
-    storedAt: string;
-    agent: string;
-    task: string;
-    durationMs: number;
-  }>;
-  pagination: { total: number; limit: number; offset: number; hasMore: boolean };
-  meta?: { mode?: string; note?: string };
+type Breakdown = { outcome: number; tests: number; efficiency: number; autonomy: number; safety: number };
+type RunRow = {
+  runId: string;
+  repository: string;
+  score: number;
+  grade: string;
+  outcome: "success" | "partial" | "failure";
+  storedAt: string;
+  evidenceCount: number;
+  riskCount: number;
+  agent: string;
+  task: string;
+  durationMs: number;
+  url: string;
+  branch: string;
+  commitSha: string;
+  workflow: string;
+  event: string;
+  status: string;
+  conclusion: string | null;
+  runNumber: number;
+  tests: { total: number; passed: number; failed: number };
+  changes: { filesChanged: number; linesAdded: number; linesDeleted: number };
+  breakdown: Breakdown;
+  recommendations: string[];
+  evidenceKinds: string[];
+  testEvidenceAvailable: boolean;
+  diffEvidenceAvailable: boolean;
+  riskAssessment: "not-assessed" | "assessed";
 };
+type ApiMeta = { source: string; repository: string; authenticated: boolean; generatedAt: string; note: string };
+type RunsResponse = { data: RunRow[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: ApiMeta };
+type EvidenceItem = { id: string; kind: string; timestamp: string; provenance: { source: string; sourceId: string; collectedAt: string }; data: Record<string, unknown> };
+type RunDetail = RunRow & { evidence: { schemaVersion: string; evidence: EvidenceItem[] }; evaluation: { evaluation: { score: number; grade: string; breakdown: Breakdown; recommendations: string[] }; policy: { id: string }; riskSignals: Array<{ type?: string; severity?: string; message?: string }> }; jobs: Array<{ id: number; name: string; status: string; conclusion: string | null; started_at?: string | null; completed_at?: string | null; html_url?: string }> };
 
-function formatDuration(durationMs: number): string {
-  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round((ms || 0) / 1000));
+  return Math.floor(total / 60) + "m " + String(total % 60).padStart(2, "0") + "s";
 }
-
 function formatAgo(value: string): string {
-  const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60000));
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "time unavailable";
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
   if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (minutes < 60) return minutes + " min ago";
+  if (minutes < 1440) return Math.floor(minutes / 60) + "h ago";
+  return Math.floor(minutes / 1440) + "d ago";
 }
-
+function average(values: number[]): number | null {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+function displayScore(value: number | null): string { return value === null ? "—" : value.toFixed(1); }
+function outcomeLabel(outcome: RunRow["outcome"]): string {
+  return outcome === "success" ? "Success" : outcome === "partial" ? "Partial" : "Failed";
+}
 function ScoreRing({ score }: { score: number }) {
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
-  const dash = (score / 100) * circumference;
-  return (
-    <div className="score-ring" aria-label={`${score} out of 100`}>
-      <svg viewBox="0 0 72 72">
-        <circle className="ring-track" cx="36" cy="36" r={radius} />
-        <circle className="ring-value" cx="36" cy="36" r={radius} strokeDasharray={`${dash} ${circumference - dash}`} />
-      </svg>
-      <strong>{score}</strong>
-    </div>
-  );
+  const dash = (Math.max(0, Math.min(100, score)) / 100) * circumference;
+  return <div className="score-ring" aria-label={score + " out of 100"}><svg viewBox="0 0 72 72"><circle className="ring-track" cx="36" cy="36" r={radius} /><circle className="ring-value" cx="36" cy="36" r={radius} strokeDasharray={dash + " " + (circumference - dash)} /></svg><strong>{score}</strong></div>;
 }
-
 function Sparkline({ values }: { values: number[] }) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const points = values.map((value, index) => {
-    const x = (index / (values.length - 1)) * 100;
+  const data = values.length ? values : [0];
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const points = data.map((value, index) => {
+    const x = data.length === 1 ? 50 : (index / (data.length - 1)) * 100;
     const y = 30 - ((value - min) / Math.max(max - min, 1)) * 24;
-    return `${x},${y}`;
+    return x + "," + y;
   }).join(" ");
-  return (
-    <svg className="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <svg className="sparkline" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true"><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+function Metric({ title, value, suffix = "", note, icon, values, warning = false }: { title: string; value: string; suffix?: string; note: string; icon: IconName; values: number[]; warning?: boolean }) {
+  return <div className="metric-card"><div className="metric-top"><span>{title}</span><div className={"metric-icon" + (warning ? " warning" : "")}><Icon name={icon} size={17} /></div></div><div className="metric-value">{value}<small>{suffix}</small></div><div className="metric-bottom"><span>{note}</span><Sparkline values={values} /></div></div>;
+}
+function Breakdown({ label, score, weight }: { label: string; score: number | null; weight: string }) {
+  return <div className="breakdown-row"><span>{label}<small>{weight} weight</small></span><div className="progress"><i style={{ width: (score ?? 0) + "%" }} /></div><strong>{score === null ? "—" : Math.round(score)}</strong></div>;
+}
+function Status({ status }: { status: string }) {
+  const cls = status === "Success" ? "success" : status === "Partial" || status === "In progress" ? "partial" : "failed";
+  return <span className={"status " + cls}><i />{status}</span>;
+}
+function PanelHeading({ title, subtitle, action }: { title: string; subtitle: string; action?: ReactNode }) {
+  return <div className="panel-head"><div><h2>{title}</h2><p>{subtitle}</p></div>{action}</div>;
+}
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return <div className="empty"><strong>{title}</strong><p>{description}</p></div>;
+}
+function RunsTable({ runs, loading, error, onSelect, compact = false }: { runs: RunRow[]; loading: boolean; error: string; onSelect: (id: string) => void; compact?: boolean }) {
+  const shown = compact ? runs.slice(0, 8) : runs;
+  return <div className="table-wrap"><table><thead><tr><th>Workflow run</th><th>Repository</th><th>Workflow</th><th>Score</th><th>Outcome</th><th>Duration</th><th></th></tr></thead><tbody>{shown.map((run) => <tr key={run.runId}><td><span className="run-id">#{run.runNumber} · {run.runId}</span><small>{formatAgo(run.storedAt)}</small></td><td><span className="repo-cell"><span className="repo-icon"><Icon name="git" size={14} /></span>{run.repository}</span></td><td><span className="task-cell">{run.workflow}</span></td><td><strong className={run.score >= 85 ? "score-good" : run.score >= 70 ? "score-mid" : "score-bad"}>{run.score}</strong><small>Grade {run.grade}</small></td><td><Status status={outcomeLabel(run.outcome)} /></td><td><span className="duration"><Icon name="clock" size={14} />{formatDuration(run.durationMs)}</span></td><td><button className="row-arrow" aria-label={"Open run " + run.runId} onClick={() => onSelect(run.runId)}><Icon name="arrow" size={15} /></button></td></tr>)}</tbody></table>{loading && <EmptyState title="Loading live workflow runs…" description="Fetching the latest evidence from GitHub Actions." />}{!loading && error && <EmptyState title="Live data could not be loaded" description={error} />}{!loading && !error && shown.length === 0 && <EmptyState title="No workflow runs found" description="This repository has no visible Actions runs for the configured query." />}</div>;
 }
 
 function App() {
@@ -109,205 +134,162 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [range, setRange] = useState("30d");
-  const [runs, setRuns] = useState<DashboardRun[]>([]);
+  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [totalRuns, setTotalRuns] = useState(0);
+  const [meta, setMeta] = useState<ApiMeta | null>(null);
+  const [health, setHealth] = useState<{ status: string; repository: string; authenticatedGitHub: boolean; storage: string } | null>(null);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [runsError, setRunsError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<RunDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
-    async function loadRuns() {
+    async function load() {
       setLoadingRuns(true);
       setRunsError("");
       try {
-        const response = await fetch("/api/runs?limit=20&offset=0", { signal: controller.signal });
-        if (!response.ok) throw new Error(`Run history request failed (${response.status}).`);
-        const payload = await response.json() as RunsResponse;
-        setRuns(payload.data.map((row) => ({
-          id: row.runId,
-          repo: row.repository ?? "Unknown repository",
-          agent: row.agent,
-          task: row.task,
-          score: row.score,
-          status: row.outcome === "success" ? "Success" : row.outcome === "partial" ? "Partial" : "Failed",
-          time: formatDuration(row.durationMs),
-          ago: formatAgo(row.storedAt),
-        })));
+        const response = await fetch("/api/runs?limit=100&offset=0", { signal: controller.signal, cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.error?.message || "GitHub Actions request failed (" + response.status + ").");
+        const payload = body as RunsResponse;
+        setRuns(payload.data);
+        setTotalRuns(payload.pagination.total);
+        setMeta(payload.meta);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setRunsError(error instanceof Error ? error.message : "Unable to load run history.");
+        setRunsError(error instanceof Error ? error.message : "Unable to load live workflow history.");
       } finally {
         if (!controller.signal.aborted) setLoadingRuns(false);
       }
     }
-    void loadRuns();
+    async function loadHealth() {
+      try {
+        const response = await fetch("/api/health", { signal: controller.signal, cache: "no-store" });
+        const body = await response.json();
+        if (response.ok) setHealth(body.data);
+      } catch { /* The run endpoint displays the actionable error state. */ }
+    }
+    void load();
+    void loadHealth();
     return () => controller.abort();
-  }, []);
+  }, [refreshKey]);
 
-  const filteredRuns = useMemo(
-    () => runs.filter((run) => [run.repo, run.agent, run.task, run.status].join(" ").toLowerCase().includes(query.toLowerCase())),
-    [runs, query],
-  );
+  useEffect(() => {
+    if (!selectedRunId) {
+      setSelectedRun(null);
+      setDetailError("");
+      return;
+    }
+    const runId = selectedRunId;
+    const controller = new AbortController();
+    async function loadDetail() {
+      setDetailLoading(true);
+      setDetailError("");
+      try {
+        const response = await fetch("/api/runs/" + encodeURIComponent(runId), { signal: controller.signal, cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.error?.message || "Unable to load run details.");
+        setSelectedRun(body.data as RunDetail);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setDetailError(error instanceof Error ? error.message : "Unable to load run details.");
+      } finally {
+        if (!controller.signal.aborted) setDetailLoading(false);
+      }
+    }
+    void loadDetail();
+    return () => controller.abort();
+  }, [selectedRunId]);
 
-  return (
-    <div className="app-shell">
-      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
-        <div className="brand">
-          <div className="brand-mark"><Icon name="spark" size={17} /></div>
-          <div><strong>AgentIQ</strong><span>Agent intelligence</span></div>
-        </div>
+  const visibleRuns = useMemo(() => {
+    const cutoff = Date.now() - (range === "7d" ? 7 : range === "90d" ? 90 : 30) * 24 * 60 * 60 * 1000;
+    return runs.filter((run) => {
+      const matchesQuery = [run.repository, run.agent, run.task, run.workflow, run.status, run.outcome, run.branch, run.runId].join(" ").toLowerCase().includes(query.toLowerCase());
+      const timestamp = Date.parse(run.storedAt);
+      return matchesQuery && (!Number.isFinite(timestamp) || timestamp >= cutoff);
+    });
+  }, [runs, query, range]);
 
-        <div className="workspace">
-          <span className="workspace-dot" />
-          <div><small>Workspace</small><strong>Personal</strong></div>
-          <Icon name="chevron" size={15} />
-        </div>
+  const averageScore = average(visibleRuns.map((run) => run.score));
+  const successRate = visibleRuns.length ? (visibleRuns.filter((run) => run.outcome === "success").length / visibleRuns.length) * 100 : null;
+  const scoreValues = visibleRuns.slice(0, 12).map((run) => run.score);
+  const averageBreakdown = {
+    outcome: average(visibleRuns.map((run) => run.breakdown.outcome)),
+    tests: average(visibleRuns.map((run) => run.breakdown.tests)),
+    efficiency: average(visibleRuns.map((run) => run.breakdown.efficiency)),
+    autonomy: average(visibleRuns.map((run) => run.breakdown.autonomy)),
+    safety: average(visibleRuns.map((run) => run.breakdown.safety)),
+  };
+  const workflows = useMemo(() => {
+    const groups = new Map<string, RunRow[]>();
+    for (const run of visibleRuns) groups.set(run.workflow, [...(groups.get(run.workflow) || []), run]);
+    return [...groups.entries()].map(([name, rows]) => ({
+      name,
+      count: rows.length,
+      average: average(rows.map((run) => run.score)) || 0,
+      successRate: rows.length ? (rows.filter((run) => run.outcome === "success").length / rows.length) * 100 : 0,
+      failures: rows.filter((run) => run.outcome === "failure").length,
+    })).sort((a, b) => b.count - a.count);
+  }, [visibleRuns]);
 
-        <nav className="nav-list">
-          <p className="nav-label">Monitor</p>
-          {nav.map((item) => (
-            <button key={item.label} className={`nav-item ${active === item.label ? "active" : ""}`} onClick={() => { setActive(item.label); setSidebarOpen(false); }}>
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-              {item.label === "Runs" && <em>24</em>}
-            </button>
-          ))}
-          <p className="nav-label nav-label-spaced">System</p>
-          <button className={`nav-item ${active === "Settings" ? "active" : ""}`} onClick={() => setActive("Settings")}><Icon name="settings" /><span>Settings</span></button>
-        </nav>
+  const navigate = (label: string) => { setActive(label); setSidebarOpen(false); setSelectedRunId(null); };
+  const refresh = () => setRefreshKey((value) => value + 1);
 
-        <div className="sidebar-footer">
-          <div className="status-line"><span className="pulse" /> All systems operational</div>
-          <div className="user-card">
-            <div className="avatar">K</div>
-            <div><strong>Kamran</strong><span>Developer</span></div>
-            <Icon name="chevron" size={15} />
-          </div>
-        </div>
-      </aside>
+  return <div className="app-shell">
+    <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
+      <div className="brand"><div className="brand-mark"><Icon name="spark" size={17} /></div><div><strong>AgentIQ</strong><span>Evidence-driven evaluation</span></div></div>
+      <div className="workspace"><span className="workspace-dot" /><div><small>Data source</small><strong>{meta?.repository || "Connecting to GitHub…"}</strong></div><Icon name="chevron" size={15} /></div>
+      <nav className="nav-list"><p className="nav-label">Monitor</p>{navigation.slice(0, 5).map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span>{item.label === "Runs" && <em>{totalRuns}</em>}</button>)}<p className="nav-label nav-label-spaced">System</p>{navigation.slice(5).map((item) => <button key={item.label} className={"nav-item" + (active === item.label ? " active" : "")} onClick={() => navigate(item.label)}><Icon name={item.icon} /><span>{item.label}</span></button>)}</nav>
+      <div className="sidebar-footer"><div className="status-line"><span className="pulse" /> {runsError ? "Data source needs attention" : loadingRuns ? "Connecting to live data" : "GitHub API connected"}</div><div className="user-card"><div className="avatar">K</div><div><strong>Workspace owner</strong><span>Developer</span></div><Icon name="chevron" size={15} /></div></div>
+    </aside>
 
-      <main className="main">
-        <header className="topbar">
-          <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)}><Icon name="menu" /></button>
-          <div className="breadcrumbs"><span>AgentIQ</span><b>/</b><strong>{active}</strong></div>
-          <div className="top-actions">
-            <label className="search-box"><Icon name="search" size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search runs, repos..." /><kbd>⌘ K</kbd></label>
-            <button className="icon-button" aria-label="Notifications"><Icon name="bell" size={18} /><span className="notification-dot" /></button>
-            <button className="primary-button"><Icon name="plus" size={17} /> New evaluation</button>
-          </div>
-        </header>
+    <main className="main">
+      <header className="topbar"><button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation"><Icon name="menu" /></button><div className="breadcrumbs"><span>AgentIQ</span><b>/</b><strong>{active}</strong></div><div className="top-actions"><label className="search-box"><Icon name="search" size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search workflows, branches…" /><kbd>⌘ K</kbd></label><button className="icon-button" aria-label="Refresh live data" title="Refresh live data" onClick={refresh}><Icon name="refresh" size={17} /></button><button className="primary-button" onClick={refresh} disabled={loadingRuns}><Icon name="refresh" size={16} /> Refresh data</button></div></header>
 
-        <div className="content">
-          <section className="hero">
-            <div>
-              <p className="eyebrow"><span className="live-dot" /> Evidence pipeline active</p>
-              <h1>Good morning, Kamran.</h1>
-              <p className="hero-copy">Measure what your coding agents actually ship — with evidence you can audit.</p>
-            </div>
-            <div className="hero-actions">
-              <button className="secondary-button">View reports <Icon name="arrow" size={16} /></button>
-            </div>
-          </section>
+      <div className="content">
+        <section className="hero"><div><p className="eyebrow"><span className="live-dot" /> {loadingRuns ? "Loading GitHub Actions evidence" : runsError ? "Live source unavailable" : "Live GitHub Actions data"}</p><h1>{active === "Overview" ? "Engineering evidence, not guesswork." : active}</h1><p className="hero-copy">{active === "Overview" ? "Evaluate real workflow outcomes and inspect the evidence behind every score." : "This view is calculated from the live workflow data currently available to AgentIQ."}</p></div><div className="hero-actions"><button className="secondary-button" onClick={() => navigate("Audit & Safety")}>Evidence coverage <Icon name="arrow" size={16} /></button></div></section>
 
-          <section className="metrics-grid">
-            <Metric title="Average score" value="86.4" suffix="/100" delta="+8.2%" icon="trend" values={[69,72,71,77,76,82,80,86,84,86]} />
-            <Metric title="Success rate" value="91.8" suffix="%" delta="+4.6%" icon="check" values={[82,85,83,88,87,89,88,91,90,92]} />
-            <Metric title="Runs evaluated" value="128" suffix="" delta="+24 this month" icon="activity" values={[44,52,57,61,72,78,81,96,111,128]} />
-            <Metric title="Safety incidents" value="3" suffix="" delta="-40% vs last month" icon="shield" values={[8,7,7,6,5,5,4,5,3,3]} warning />
-          </section>
+        {selectedRunId && <section className="panel detail-panel">
+          <PanelHeading title={selectedRun ? "Workflow run #" + selectedRun.runNumber : "Workflow run details"} subtitle={selectedRun ? selectedRun.workflow + " · " + selectedRun.repository : "Fetching run metadata, jobs, and step evidence"} action={<button className="more-button" aria-label="Close run details" onClick={() => setSelectedRunId(null)}><Icon name="close" size={16} /></button>} />
+          {detailLoading && <EmptyState title="Loading run evidence…" description="Requesting the workflow and job details from GitHub." />}
+          {!detailLoading && detailError && <EmptyState title="Run details unavailable" description={detailError} />}
+          {!detailLoading && selectedRun && <div className="detail-body">
+            <div className="detail-summary"><ScoreRing score={selectedRun.score} /><div><strong>{selectedRun.score}/100 · Grade {selectedRun.grade}</strong><span><Status status={outcomeLabel(selectedRun.outcome)} /> · {formatDuration(selectedRun.durationMs)}</span><p>{selectedRun.task}</p><a href={selectedRun.url} target="_blank" rel="noreferrer">Open run in GitHub <Icon name="external" size={13} /></a></div></div>
+            <div className="detail-grid"><div><small>Branch</small><strong>{selectedRun.branch || "Unknown"}</strong></div><div><small>Commit</small><strong>{selectedRun.commitSha.slice(0, 12) || "Unknown"}</strong></div><div><small>Test evidence</small><strong>{selectedRun.testEvidenceAvailable ? selectedRun.tests.total + " tests" : "Not connected"}</strong></div><div><small>Diff risk</small><strong>{selectedRun.diffEvidenceAvailable ? selectedRun.riskCount + " signals" : "Not assessed"}</strong></div></div>
+            <h3 className="detail-section-title">Score breakdown</h3><div className="breakdown-list"><Breakdown label="Outcome" score={selectedRun.breakdown.outcome} weight="35%" /><Breakdown label="Tests" score={selectedRun.breakdown.tests} weight="30%" /><Breakdown label="Efficiency" score={selectedRun.breakdown.efficiency} weight="15%" /><Breakdown label="Autonomy" score={selectedRun.breakdown.autonomy} weight="10%" /><Breakdown label="Safety" score={selectedRun.breakdown.safety} weight="10%" /></div>
+            {!selectedRun.testEvidenceAvailable && <p className="evidence-note"><Icon name="alert" size={15} /> The scoring model uses its documented neutral test score because this workflow does not expose a parsed test report. This is not a claim that tests passed.</p>}
+            {!selectedRun.diffEvidenceAvailable && <p className="evidence-note"><Icon name="shield" size={15} /> Code-diff and sensitive-path evidence are not connected for this run. Safety risk is not assessed; zero detected signals must not be interpreted as safe.</p>}
+            <h3 className="detail-section-title">Evidence collected ({selectedRun.evidence.evidence.length})</h3><div className="evidence-list">{selectedRun.evidence.evidence.map((item) => <div key={item.id}><span>{item.kind}</span><small>{item.provenance.sourceId} · {formatAgo(item.timestamp)}</small></div>)}</div>
+            {selectedRun.jobs.length > 0 && <><h3 className="detail-section-title">Jobs and steps</h3><div className="evidence-list">{selectedRun.jobs.map((job) => <div key={job.id}><span>{job.name} · {job.conclusion || job.status}</span><small>{job.started_at ? formatAgo(job.started_at) : "Start time unavailable"} · {job.completed_at ? "completed" : job.status}</small></div>)}</div></>}
+            {selectedRun.recommendations.length > 0 && <><h3 className="detail-section-title">Recommendations</h3><ul className="recommendations">{selectedRun.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></>}
+          </div>}
+        </section>}
 
-          <section className="dashboard-grid">
-            <div className="panel performance-panel">
-              <div className="panel-head">
-                <div><h2>Agent performance</h2><p>Score and reliability over the last 30 days</p></div>
-                <div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div>
-              </div>
-              <div className="chart">
-                <div className="chart-y"><span>100</span><span>80</span><span>60</span><span>40</span></div>
-                <div className="chart-area">
-                  {[0,1,2,3].map((line) => <div className="grid-line" style={{ top: `${line * 33.3}%` }} key={line} />)}
-                  <div className="chart-bars">{[74,81,77,86,83,89,87,92,88,94,91,96].map((v, i) => <div className="bar-wrap" key={i}><div className="chart-bar" style={{ height: `${v}%` }} /><span>{i % 2 === 0 ? ["Sep 12","Sep 16","Sep 20","Sep 24","Sep 28","Oct 02"][i/2] : ""}</span></div>)}</div>
-                </div>
-              </div>
-              <div className="chart-legend"><span><i className="legend-score" /> Average score</span><span><i className="legend-target" /> Target 85</span></div>
-            </div>
+        {active === "Overview" && <>
+          <section className="metrics-grid"><Metric title="Average score" value={displayScore(averageScore)} suffix="/100" note={visibleRuns.length ? "Latest " + visibleRuns.length + " matching runs" : "No matching runs yet"} icon="trend" values={scoreValues} /><Metric title="Workflow success rate" value={successRate === null ? "—" : successRate.toFixed(1)} suffix="%" note={visibleRuns.length ? visibleRuns.filter((run) => run.outcome === "success").length + " successful runs" : "No workflow evidence"} icon="check" values={visibleRuns.map((run) => run.outcome === "success" ? 100 : 0)} /><Metric title="GitHub Actions runs" value={String(totalRuns)} note="Total runs reported by GitHub" icon="activity" values={visibleRuns.map((run) => run.score)} /><Metric title="Risk assessment" value={visibleRuns.some((run) => run.diffEvidenceAvailable) ? String(visibleRuns.filter((run) => run.riskCount > 0).length) : "N/A"} note={visibleRuns.some((run) => run.diffEvidenceAvailable) ? "Runs with recorded risk signals" : "Diff evidence is not connected"} icon="shield" values={visibleRuns.map((run) => run.riskCount)} warning={!visibleRuns.some((run) => run.diffEvidenceAvailable)} /></section>
+          <section className="dashboard-grid"><div className="panel performance-panel"><PanelHeading title="Workflow score history" subtitle={"Scores calculated from the latest " + visibleRuns.length + " matching workflow runs"} action={<div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div>} /><div className="chart"><div className="chart-y"><span>100</span><span>80</span><span>60</span><span>40</span></div><div className="chart-area">{[0,1,2,3].map((line) => <div className="grid-line" style={{ top: (line * 33.3) + "%" }} key={line} />)}<div className="chart-bars">{visibleRuns.slice(0, 12).reverse().map((run) => <div className="bar-wrap" key={run.runId} title={run.workflow + ": " + run.score}><div className="chart-bar" style={{ height: Math.max(4, run.score) + "%" }} /><span>#{run.runNumber}</span></div>)}</div></div></div><div className="chart-legend"><span><i className="legend-score" /> Evidence-based score</span><span>{meta?.source || "GitHub Actions"}</span></div>{!loadingRuns && !runsError && visibleRuns.length === 0 && <EmptyState title="No chart data" description="Runs will appear after GitHub reports workflow activity." />}</div>
+          <div className="panel breakdown-panel"><PanelHeading title="Average score breakdown" subtitle="The documented deterministic scoring policy" /><div className="breakdown-score"><ScoreRing score={Math.round(averageScore || 0)} /><div><strong>{averageScore === null ? "Waiting for evidence" : averageScore >= 80 ? "Strong workflow outcomes" : averageScore >= 60 ? "Mixed workflow outcomes" : "Needs investigation"}</strong><span>Calculated from visible workflow runs</span></div></div><div className="breakdown-list"><Breakdown label="Outcome" score={averageBreakdown.outcome} weight="35%" /><Breakdown label="Tests" score={averageBreakdown.tests} weight="30%" /><Breakdown label="Efficiency" score={averageBreakdown.efficiency} weight="15%" /><Breakdown label="Autonomy" score={averageBreakdown.autonomy} weight="10%" /><Breakdown label="Safety" score={averageBreakdown.safety} weight="10%" /></div><p className="evidence-note"><Icon name="alert" size={15} /> Test and safety scores can be provisional when test reports and code diffs are absent. Open a run to see evidence coverage.</p></div></section>
+          <section className="panel runs-panel"><PanelHeading title="Recent workflow evaluations" subtitle="Real GitHub Actions runs, refreshed from the configured repository" action={<button className="text-button" onClick={() => navigate("Runs")}>View all <Icon name="arrow" size={15} /></button>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} compact /></section>
+        </>}
 
-            <div className="panel breakdown-panel">
-              <div className="panel-head"><div><h2>Score breakdown</h2><p>Current evaluation policy</p></div><button className="more-button">•••</button></div>
-              <div className="breakdown-score"><ScoreRing score={86} /><div><strong>Strong performance</strong><span>+8.2 points this month</span></div></div>
-              <div className="breakdown-list">
-                <Breakdown label="Outcome" score={94} weight="35%" />
-                <Breakdown label="Tests" score={91} weight="30%" />
-                <Breakdown label="Efficiency" score={79} weight="15%" />
-                <Breakdown label="Autonomy" score={82} weight="10%" />
-                <Breakdown label="Safety" score={96} weight="10%" />
-              </div>
-            </div>
-          </section>
+        {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
 
-          <section className="panel runs-panel">
-            <div className="panel-head runs-head">
-              <div><h2>Recent evaluations</h2><p>Latest agent runs across connected repositories</p></div>
-              <button className="text-button">View all <Icon name="arrow" size={15} /></button>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Run</th><th>Repository</th><th>Agent</th><th>Task</th><th>Score</th><th>Status</th><th>Duration</th><th> </th></tr></thead>
-                <tbody>
-                  {filteredRuns.map((run) => (
-                    <tr key={run.id}>
-                      <td><span className="run-id">{run.id}</span><small>{run.ago}</small></td>
-                      <td><span className="repo-cell"><span className="repo-icon"><Icon name="git" size={14} /></span>{run.repo}</span></td>
-                      <td><span className="agent-name">{run.agent}</span></td>
-                      <td><span className="task-cell">{run.task}</span></td>
-                      <td><strong className={run.score >= 85 ? "score-good" : run.score >= 70 ? "score-mid" : "score-bad"}>{run.score}</strong></td>
-                      <td><Status status={run.status} /></td>
-                      <td><span className="duration"><Icon name="clock" size={14} />{run.time}</span></td>
-                      <td><button className="row-arrow" aria-label={`Open ${run.id}`}><Icon name="arrow" size={15} /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {loadingRuns && <div className="empty">Loading evaluations from the AgentIQ API…</div>}
-              {!loadingRuns && runsError && <div className="empty">{runsError} Start the API with <code>npm run api:dev</code>.</div>}
-              {!loadingRuns && !runsError && filteredRuns.length === 0 && <div className="empty">No evaluations match “{query}”.</div>}
-            </div>
-          </section>
+        {active === "Repositories" && <section className="panel"><PanelHeading title="Connected repository" subtitle="The production API reads Actions history from this configured repository." /><div className="repository-card"><div className="repo-icon large"><Icon name="git" size={22} /></div><div className="repository-main"><strong>{meta?.repository || health?.repository || "Repository configuration unavailable"}</strong><span>{health?.status === "ok" ? "API healthy" : "Health status unavailable"} · {meta?.authenticated ? "Authenticated GitHub API" : "Public GitHub API"}</span><p>Latest branch: {visibleRuns[0]?.branch || "No branch evidence"} · {totalRuns} total workflow runs</p></div><a className="secondary-button" href={"https://github.com/" + (meta?.repository || health?.repository || "kamran-nizamani/AgentIQ")} target="_blank" rel="noreferrer">Open repository <Icon name="external" size={14} /></a></div><div className="detail-grid"><div><small>Workflows observed</small><strong>{workflows.length}</strong></div><div><small>Runs in current range</small><strong>{visibleRuns.length}</strong></div><div><small>Test evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.testEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div><div><small>Diff evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.diffEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div></div><p className="evidence-note"><Icon name="alert" size={15} /> Repository selection is environment-configured in this release. To connect another repository, set AGENTIQ_GITHUB_REPOSITORY in Vercel project settings; use a least-privilege GITHUB_TOKEN for private repositories.</p></section>}
 
-          <section className="bottom-grid">
-            <div className="panel insight-card">
-              <div className="insight-icon"><Icon name="spark" size={19} /></div>
-              <div><span className="card-kicker">AgentIQ insight</span><h3>Tests are your biggest scoring lever</h3><p>Runs with complete test evidence average <strong>11.4 points higher</strong> than runs without it.</p><button className="text-button">Explore evidence <Icon name="arrow" size={15} /></button></div>
-            </div>
-            <div className="panel alert-card">
-              <div className="alert-icon"><Icon name="alert" size={19} /></div>
-              <div><span className="card-kicker">Needs attention</span><h3>3 safety signals detected</h3><p>Two dependency changes and one sensitive configuration change need review.</p><button className="text-button">Open audit <Icon name="arrow" size={15} /></button></div>
-            </div>
-          </section>
+        {active === "Benchmarks" && <section className="panel runs-panel"><PanelHeading title="Workflow performance comparison" subtitle="Compare actual workflows by recent outcome and deterministic score. This is not yet a controlled agent-vs-agent benchmark." /><div className="table-wrap"><table><thead><tr><th>Workflow</th><th>Runs</th><th>Average score</th><th>Success rate</th><th>Failures</th></tr></thead><tbody>{workflows.map((workflow) => <tr key={workflow.name}><td><strong className="agent-name">{workflow.name}</strong></td><td>{workflow.count}</td><td><strong className={workflow.average >= 85 ? "score-good" : workflow.average >= 70 ? "score-mid" : "score-bad"}>{workflow.average.toFixed(1)}</strong></td><td>{workflow.successRate.toFixed(1)}%</td><td>{workflow.failures}</td></tr>)}</tbody></table>{!loadingRuns && !runsError && workflows.length === 0 && <EmptyState title="No workflow data to compare" description="Workflow comparisons will appear when GitHub Actions runs are available." />}{runsError && <EmptyState title="Live comparison unavailable" description={runsError} />}</div></section>}
 
-          <footer className="footer"><span>AgentIQ v0.1 · Evidence before opinion.</span><span><span className="footer-dot" /> API run history · demo data</span></footer>
-        </div>
-      </main>
-    </div>
-  );
-}
+        {active === "Audit & Safety" && <><section className="metrics-grid"><Metric title="Failed workflows" value={String(visibleRuns.filter((run) => run.outcome === "failure").length)} note="Visible runs with failure outcomes" icon="alert" values={visibleRuns.map((run) => run.outcome === "failure" ? 100 : 0)} warning /><Metric title="Test evidence coverage" value={(visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.testEvidenceAvailable).length / visibleRuns.length * 100) : 0) + "%"} note="Runs with parsed test reports" icon="check" values={visibleRuns.map((run) => run.testEvidenceAvailable ? 100 : 0)} /><Metric title="Diff evidence coverage" value={(visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.diffEvidenceAvailable).length / visibleRuns.length * 100) : 0) + "%"} note="Runs with code-change evidence" icon="git" values={visibleRuns.map((run) => run.diffEvidenceAvailable ? 100 : 0)} warning /><Metric title="Runs with risk signals" value={visibleRuns.some((run) => run.diffEvidenceAvailable) ? String(visibleRuns.filter((run) => run.riskCount > 0).length) : "N/A"} note="Only meaningful when risk evidence exists" icon="shield" values={visibleRuns.map((run) => run.riskCount)} warning={!visibleRuns.some((run) => run.diffEvidenceAvailable)} /></section><section className="panel"><PanelHeading title="Safety evidence coverage" subtitle="Absence of evidence is not evidence of safety." /><p className="evidence-note"><Icon name="alert" size={16} /> Current live integration collects workflow and job metadata. It does not yet ingest repository diffs, dependency changes, sensitive paths, test reports, or rollback evidence. For this reason, risk assessment is shown as not assessed rather than reporting zero incidents.</p><RunsTable runs={visibleRuns.filter((run) => run.outcome !== "success" || !run.diffEvidenceAvailable)} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section></>}
 
-function Metric({ title, value, suffix, delta, icon, values, warning = false }: { title: string; value: string; suffix: string; delta: string; icon: IconName; values: number[]; warning?: boolean }) {
-  return (
-    <div className="metric-card">
-      <div className="metric-top"><span>{title}</span><div className={`metric-icon ${warning ? "warning" : ""}`}><Icon name={icon} size={17} /></div></div>
-      <div className="metric-value">{value}<small>{suffix}</small></div>
-      <div className="metric-bottom"><span className={delta.startsWith("-") ? "positive" : "positive"}>{delta}</span><Sparkline values={values} /></div>
-    </div>
-  );
-}
+        {active === "Settings" && <section className="panel settings-panel"><PanelHeading title="Data source settings" subtitle="Production configuration and integration health." /><div className="settings-row"><div><strong>Repository</strong><p>Configured by AGENTIQ_GITHUB_REPOSITORY on Vercel.</p></div><span>{meta?.repository || health?.repository || "Unavailable"}</span></div><div className="settings-row"><div><strong>GitHub API authentication</strong><p>Tokens are read only by the server; they are never sent to the browser.</p></div><Status status={meta?.authenticated ? "Success" : "Partial"} /></div><div className="settings-row"><div><strong>Live API</strong><p>Health endpoint: /api/health</p></div><Status status={health?.status === "ok" ? "Success" : "Partial"} /></div><div className="settings-row"><div><strong>History source</strong><p>Workflow runs are fetched from GitHub at request time; Vercel SQLite persistence is not assumed.</p></div><span>GitHub Actions</span></div><div className="settings-row"><div><strong>Evidence limitations</strong><p>{meta?.note || "Test reports and code-diff evidence are not connected."}</p></div><button className="secondary-button" onClick={() => navigate("Audit & Safety")}>Review coverage <Icon name="arrow" size={14} /></button></div><div className="settings-actions"><button className="primary-button" onClick={refresh}><Icon name="refresh" size={15} /> Check connection again</button></div></section>}
 
-function Breakdown({ label, score, weight }: { label: string; score: number; weight: string }) {
-  return <div className="breakdown-row"><span>{label}<small>{weight} weight</small></span><div className="progress"><i style={{ width: `${score}%` }} /></div><strong>{score}</strong></div>;
-}
-
-function Status({ status }: { status: string }) {
-  const cls = status === "Success" ? "success" : status === "Partial" ? "partial" : "failed";
-  return <span className={`status ${cls}`}><i />{status}</span>;
+        <footer className="footer"><span>AgentIQ · Evidence before opinion.</span><span><span className="footer-dot" /> {meta?.source || "GitHub Actions live source"} · {meta?.generatedAt ? "Updated " + formatAgo(meta.generatedAt) : "Waiting for source"}</span></footer>
+      </div>
+    </main>
+  </div>;
 }
 
 export default App;

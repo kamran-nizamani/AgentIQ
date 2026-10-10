@@ -1532,56 +1532,38 @@ to:
 
 # Development
 
-## Requirements
+## Local development
 
-- Node.js 22+
-- npm
+Requirements: Node.js 22+ and npm.
 
-## Install
-
-```bash
-npm install
-```
-
-## Run the full application
-
-Install dependencies, then start the API and frontend together:
+The full local application uses the Node API and SQLite store:
 
 ```bash
 npm install
 npm run dev
 ```
 
-The dashboard is available at `http://localhost:5173`; Vite proxies `/api/*` to the local API on `http://127.0.0.1:8787`.
+- Web dashboard: `http://localhost:5173`
+- Local API: `http://127.0.0.1:8787`
+- Local run history: `./data/agentiq.sqlite`
 
-For separate processes, use `npm run api:dev` and `npm run web:dev`. The API persists run history in SQLite (`./data/agentiq.sqlite`) and supports authenticated collection of GitHub Actions workflow/job evidence. See [`apps/api/README.md`](apps/api/README.md) for environment setup and security notes.
+Set `AGENTIQ_GITHUB_REPOSITORY`, `GITHUB_TOKEN`, and `AGENTIQ_INGEST_TOKEN` in the API process when testing the local authenticated ingestion endpoint. Never commit credentials.
 
-## Run tests
+## Vercel production
+
+The production dashboard uses Vercel serverless API routes under `/api` and reads live GitHub Actions workflow/job metadata for the configured repository. The default repository is `kamran-nizamani/AgentIQ`; override it with `AGENTIQ_GITHUB_REPOSITORY=owner/repo` in Vercel project environment variables. Public repositories work without a token; configure a least-privilege `GITHUB_TOKEN` on Vercel for private repositories and higher API limits.
+
+Vercel's ephemeral filesystem is **not** treated as persistent SQLite storage. Production run history comes from GitHub Actions. The live score uses the deterministic evaluator and explicitly marks missing test-report and code-diff evidence as unassessed; it must not be interpreted as proof that tests passed or a change is safe. Durable AgentIQ-owned history, test report parsers, and code-diff risk analysis require their respective integrations.
+
+## Checks
 
 ```bash
 npm test
-```
-
-## Typecheck
-
-```bash
 npm run typecheck
+npm run api:typecheck
+npm run web:typecheck
+npm run web:build
 ```
-
-## Development principles
-
-Before adding a feature:
-
-1. Define the problem.
-2. Identify the evidence required.
-3. Define the canonical data model.
-4. Keep provider-specific code at the boundary.
-5. Add tests.
-6. Document behavior.
-7. Update the roadmap.
-8. Verify CI.
-
----
 
 # Project Status
 
