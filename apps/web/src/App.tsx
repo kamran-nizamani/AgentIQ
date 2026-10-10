@@ -184,12 +184,13 @@ function App() {
       setDetailError("");
       return;
     }
+    const runId = selectedRunId;
     const controller = new AbortController();
     async function loadDetail() {
       setDetailLoading(true);
       setDetailError("");
       try {
-        const response = await fetch("/api/runs/" + encodeURIComponent(selectedRunId), { signal: controller.signal, cache: "no-store" });
+        const response = await fetch("/api/runs/" + encodeURIComponent(runId), { signal: controller.signal, cache: "no-store" });
         const body = await response.json();
         if (!response.ok) throw new Error(body?.error?.message || "Unable to load run details.");
         setSelectedRun(body.data as RunDetail);
