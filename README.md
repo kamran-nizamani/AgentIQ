@@ -1624,3 +1624,20 @@ Build the measurement layer for AI-powered software engineering.
 - [ ] CI/workflow history collector
 - [ ] Review/comment evidence collector
 - [ ] Risk signal extraction
+
+
+## Durable production run history
+
+The Vercel dashboard reads current workflow metadata from GitHub Actions. To preserve observed summaries and full run-detail evidence across Vercel deployments, configure Supabase Postgres as the server-side archive.
+
+1. Create or choose a Supabase project.
+2. Open the Supabase SQL Editor and run `supabase/migrations/202610110001_durable_run_history.sql`.
+3. In the Vercel project settings, add these **server-only** environment variables for Production (and Preview if desired):
+   - `SUPABASE_URL`: the project's HTTPS URL, such as `https://your-project.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY`: the project's service-role key
+4. Redeploy the production deployment, then check `/api/health` for `durableStorageConfigured: true` and `storage: "supabase-postgres"`.
+5. Open the dashboard and a workflow run. The list page archives the fetched workflow page; opening a run stores the detailed evidence snapshot. If a workflow is later unavailable from GitHub, AgentIQ can return the archived detail snapshot.
+
+The service-role key must never use a `VITE_` prefix, be committed to Git, or be exposed in browser code. The tables have Row Level Security enabled and intentionally define no public access policies; the Vercel API uses the key only on the server. Without both variables, AgentIQ continues to work in live-GitHub-only mode. If the database is configured but temporarily unavailable, the API falls back to live GitHub data and marks storage as unavailable in response metadata.
+
+This archive is populated as dashboard pages and run details are visited; it is not a retroactive import of every historical workflow in GitHub. The archive retains evidence snapshots for records AgentIQ has actually observed.
