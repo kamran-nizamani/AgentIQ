@@ -147,6 +147,7 @@ function App() {
   const [detailError, setDetailError] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [activeCommandIndex, setActiveCommandIndex] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -284,9 +285,9 @@ function App() {
 
       {commandOpen && <div className="command-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setCommandOpen(false); }}>
         <section className="command-dialog" role="dialog" aria-modal="true" aria-label="Command menu">
-          <div className="command-search"><Icon name="search" size={18} /><input autoFocus value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="Type a command or navigate…" /><kbd>ESC</kbd></div>
+          <div className="command-search"><Icon name="search" size={18} /><input autoFocus value={commandQuery} onChange={(event) => { setCommandQuery(event.target.value); setActiveCommandIndex(0); }} onKeyDown={(event) => { if (event.key === "ArrowDown" && commandItems.length > 0) { event.preventDefault(); setActiveCommandIndex((index) => (index + 1) % commandItems.length); } else if (event.key === "ArrowUp" && commandItems.length > 0) { event.preventDefault(); setActiveCommandIndex((index) => (index - 1 + commandItems.length) % commandItems.length); } else if (event.key === "Enter" && commandItems[activeCommandIndex]) { event.preventDefault(); commandItems[activeCommandIndex].action(); } }} placeholder="Type a command or navigate…" /><kbd>ESC</kbd></div>
           <p className="command-label">QUICK ACTIONS</p>
-          <div className="command-items">{commandItems.map((item) => <button key={item.label} className="command-item" onClick={item.action}><span className="command-item-icon"><Icon name={item.label.startsWith("Go to") ? "grid" : item.label.startsWith("Refresh") ? "refresh" : item.label.startsWith("Export") ? "arrow" : "close"} size={16} /></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><Icon name="arrow" size={15} /></button>)}
+          <div className="command-items">{commandItems.map((item, index) => <button key={item.label} className={"command-item" + (index === activeCommandIndex ? " active" : "")} onMouseEnter={() => setActiveCommandIndex(index)} onClick={item.action}><span className="command-item-icon"><Icon name={item.label.startsWith("Go to") ? "grid" : item.label.startsWith("Refresh") ? "refresh" : item.label.startsWith("Export") ? "arrow" : "close"} size={16} /></span><span><strong>{item.label}</strong><small>{item.detail}</small></span><Icon name="arrow" size={15} /></button>)}
           {commandItems.length === 0 && <EmptyState title="No matching commands" description="Try a page name, refresh, export, or clear search." />}</div>
           <div className="command-footer"><span>Navigate your workspace faster</span><span><kbd>↵</kbd> Select <kbd>esc</kbd> Close</span></div>
         </section>
