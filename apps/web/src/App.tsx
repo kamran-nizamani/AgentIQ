@@ -70,6 +70,19 @@ type ApiMeta = { source: string; repository: string; authenticated: boolean; gen
 type RunsResponse = { data: RunRow[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: ApiMeta };
 type EvidenceItem = { id: string; kind: string; timestamp: string; provenance: { source: string; sourceId: string; collectedAt: string }; data: Record<string, unknown> };
 type RunDetail = RunRow & { evidence: { schemaVersion: string; evidence: EvidenceItem[] }; evaluation: { evaluation: { score: number; grade: string; breakdown: Breakdown; recommendations: string[] }; policy: { id: string }; riskSignals: Array<{ type?: string; category?: string; severity?: string; message?: string }> }; jobs: Array<{ id: number; name: string; status: string; conclusion: string | null; started_at?: string | null; completed_at?: string | null; html_url?: string }> };
+type RepositoryInspection = {
+  repository: { name: string; fullName: string; url: string; description: string | null; visibility: string; fork: boolean; archived: boolean; defaultBranch: string; primaryLanguage: string | null; stars: number; watchers: number; forks: number; openIssues: number; sizeKb: number; createdAt: string; updatedAt: string; pushedAt: string | null; license: string; topics: string[]; owner: { login: string; avatarUrl: string; url: string } };
+  languages: Array<{ name: string; bytes: number }>;
+  readme: { name: string; url: string; text: string };
+  rootFiles: Array<{ name: string; type: string; path: string; url: string }>;
+  branches: Array<{ name: string; protected: boolean; sha: string }>;
+  commits: Array<{ sha: string; shortSha: string; url: string; message: string; author: string; date: string | null }>;
+  issues: Array<{ number: number; title: string; url: string; state: string; createdAt: string; author: string }>;
+  pullRequests: Array<{ number: number; title: string; url: string; state: string; draft: boolean; updatedAt: string; author: string }>;
+  actions: { totalRuns: number; runs: Array<{ id: number; name: string; url: string; status: string; conclusion: string | null; createdAt: string; branch: string }> };
+  meta: { generatedAt: string; authenticated: boolean; limitations: string };
+};
+
 
 function formatDuration(ms: number): string {
   const total = Math.max(0, Math.round((ms || 0) / 1000));
@@ -147,6 +160,10 @@ function App() {
   const [detailError, setDetailError] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [repositoryInput, setRepositoryInput] = useState("");
+  const [repositoryInspecting, setRepositoryInspecting] = useState(false);
+  const [repositoryInspectError, setRepositoryInspectError] = useState("");
+  const [inspectedRepository, setInspectedRepository] = useState<RepositoryInspection | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -271,6 +288,23 @@ function App() {
     { label: "Clear search", detail: "Reset the global search filter", action: () => { setQuery(""); setCommandOpen(false); } },
   ].filter((item) => (item.label + " " + item.detail).toLowerCase().includes(commandQuery.toLowerCase()));
 
+  async function inspectRepository(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = repositoryInput.trim();
+    if (!value) { setRepositoryInspectError("Paste a GitHub repository URL first."); return; }
+    setRepositoryInspecting(true);
+    setRepositoryInspectError("");
+    setInspectedRepository(null);
+    try {
+      const response = await fetch("/api/repository?url=" + encodeURIComponent(value), { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || "Repository inspection failed.");
+      setInspectedRepository(body.data as RepositoryInspection);
+    } catch (error) {
+      setRepositoryInspectError(error instanceof Error ? error.message : "Could not inspect this repository.");
+    } finally { setRepositoryInspecting(false); }
+  }
+
   return <div className="app-shell">
     <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
       <div className="brand"><div className="brand-mark"><Icon name="spark" size={17} /></div><div><strong>AgentIQ</strong><span>Evidence-driven evaluation</span></div></div>
@@ -326,8 +360,49 @@ function App() {
 
         {active === "Runs" && <section className="panel runs-panel"><PanelHeading title="Workflow run history" subtitle={totalRuns + " runs reported by GitHub · search and date range filters apply"} action={<div className="runs-toolbar"><button className="secondary-button export-button" onClick={exportRuns} disabled={visibleRuns.length === 0}><Icon name="arrow" size={14} /> Export CSV</button><div className="segmented">{["7d","30d","90d"].map((item) => <button key={item} className={range === item ? "selected" : ""} onClick={() => setRange(item)}>{item}</button>)}</div></div>} /><RunsTable runs={visibleRuns} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section>}
 
-        {active === "Repositories" && <section className="panel"><PanelHeading title="Connected repository" subtitle="The production API reads Actions history from this configured repository." /><div className="repository-card"><div className="repo-icon large"><Icon name="git" size={22} /></div><div className="repository-main"><strong>{meta?.repository || health?.repository || "Repository configuration unavailable"}</strong><span>{health?.status === "ok" ? "API healthy" : "Health status unavailable"} · {meta?.authenticated ? "Authenticated GitHub API" : "Public GitHub API"}</span><p>Latest branch: {visibleRuns[0]?.branch || "No branch evidence"} · {totalRuns} total workflow runs</p></div><a className="secondary-button" href={"https://github.com/" + (meta?.repository || health?.repository || "kamran-nizamani/AgentIQ")} target="_blank" rel="noreferrer">Open repository <Icon name="external" size={14} /></a></div><div className="detail-grid"><div><small>Workflows observed</small><strong>{workflows.length}</strong></div><div><small>Runs in current range</small><strong>{visibleRuns.length}</strong></div><div><small>Test evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.testEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div><div><small>Diff evidence coverage</small><strong>{visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.diffEvidenceAvailable).length / visibleRuns.length * 100) : 0}%</strong></div></div><p className="evidence-note"><Icon name="alert" size={15} /> Repository selection is environment-configured in this release. To connect another repository, set AGENTIQ_GITHUB_REPOSITORY in Vercel project settings; use a least-privilege GITHUB_TOKEN for private repositories.</p></section>}
 
+        {active === "Repositories" && <section className="repository-inspector-page">
+          <section className="panel inspector-search-panel">
+            <PanelHeading title="Universal repository inspector" subtitle="Paste any GitHub repository URL to inspect its metadata, code footprint, activity, and CI." />
+            <form className="repository-search-form" onSubmit={inspectRepository}>
+              <div className="repository-url-field"><Icon name="git" size={19} /><input value={repositoryInput} onChange={(event) => setRepositoryInput(event.target.value)} placeholder="https://github.com/owner/repository" aria-label="GitHub repository URL" autoComplete="url" /></div>
+              <button className="primary-button" type="submit" disabled={repositoryInspecting}>{repositoryInspecting ? "Inspecting…" : <><Icon name="search" size={16} /> Inspect repository</>}</button>
+            </form>
+            <div className="inspector-hints"><span>Public repositories work without login</span><span>URL or owner/repository format</span><button type="button" onClick={() => setRepositoryInput("facebook/react")}>Try facebook/react</button></div>
+            {repositoryInspectError && <div className="inspector-error"><Icon name="alert" size={16} />{repositoryInspectError}</div>}
+          </section>
+          {!inspectedRepository && !repositoryInspecting && <section className="inspector-empty-grid">
+            <div className="panel inspector-empty-card"><strong>Repository overview</strong><p>Stars, forks, license, branch, and last push.</p></div>
+            <div className="panel inspector-empty-card"><strong>Engineering activity</strong><p>Recent commits, open issues, pull requests, and Actions.</p></div>
+            <div className="panel inspector-empty-card"><strong>Code footprint</strong><p>Languages, root files, branches, and README preview.</p></div>
+          </section>}
+          {repositoryInspecting && <section className="panel inspector-loading"><span className="inspector-spinner" /><div><strong>Inspecting GitHub repository…</strong><p>Loading metadata and available activity endpoints.</p></div></section>}
+          {inspectedRepository && <div className="inspector-results">
+            <section className="panel inspector-hero">
+              <div className="inspector-repo-identity"><img src={inspectedRepository.repository.owner.avatarUrl} alt="" /><div><div className="inspector-eyebrow">GITHUB REPOSITORY · {inspectedRepository.repository.visibility}{inspectedRepository.repository.fork ? " · FORK" : ""}{inspectedRepository.repository.archived ? " · ARCHIVED" : ""}</div><h2>{inspectedRepository.repository.fullName}</h2><p>{inspectedRepository.repository.description || "No repository description provided."}</p><a href={inspectedRepository.repository.url} target="_blank" rel="noreferrer">Open on GitHub <Icon name="external" size={13} /></a></div></div>
+              <div className="inspector-stats"><div><span>Stars</span><strong>★ {inspectedRepository.repository.stars.toLocaleString()}</strong></div><div><span>Forks</span><strong>{inspectedRepository.repository.forks.toLocaleString()}</strong></div><div><span>Open issues</span><strong>{inspectedRepository.repository.openIssues.toLocaleString()}</strong></div><div><span>Latest push</span><strong>{inspectedRepository.repository.pushedAt ? formatAgo(inspectedRepository.repository.pushedAt) : "Unknown"}</strong></div></div>
+            </section>
+            <section className="inspector-metric-grid">
+              <div className="panel inspector-mini-metric"><span>Primary language</span><strong>{inspectedRepository.repository.primaryLanguage || "Not detected"}</strong><small>{inspectedRepository.languages.length} languages detected</small></div>
+              <div className="panel inspector-mini-metric"><span>Default branch</span><strong>{inspectedRepository.repository.defaultBranch}</strong><small>{inspectedRepository.branches.length} branches listed</small></div>
+              <div className="panel inspector-mini-metric"><span>License</span><strong>{inspectedRepository.repository.license}</strong><small>{inspectedRepository.repository.sizeKb.toLocaleString()} KB size</small></div>
+              <div className="panel inspector-mini-metric"><span>GitHub Actions</span><strong>{inspectedRepository.actions.totalRuns.toLocaleString()} runs</strong><small>Reported workflow activity</small></div>
+            </section>
+            <section className="inspector-two-column">
+              <div className="panel"><PanelHeading title="Languages" subtitle="Share of GitHub-reported code bytes." />{inspectedRepository.languages.length ? <div className="inspector-language-list">{inspectedRepository.languages.slice(0,8).map((language) => { const total = inspectedRepository.languages.reduce((sum, item) => sum + item.bytes, 0); const pct = total ? language.bytes / total * 100 : 0; return <div className="inspector-language" key={language.name}><div><span>{language.name}</span><strong>{pct.toFixed(1)}%</strong></div><div className="inspector-language-track"><i style={{width:pct+"%"}} /></div></div>; })}</div> : <EmptyState title="No language data" description="GitHub did not return language statistics." />}</div>
+              <div className="panel"><PanelHeading title="Repository contents" subtitle="Files and folders at the root." />{inspectedRepository.rootFiles.length ? <div className="inspector-file-list">{inspectedRepository.rootFiles.map((file) => <a key={file.path} href={file.url} target="_blank" rel="noreferrer"><span>{file.type === "dir" ? "▰" : "▱"}</span>{file.name}<small>{file.type === "dir" ? "Folder" : "File"}</small></a>)}</div> : <EmptyState title="Contents unavailable" description="The repository may be empty or this endpoint is unavailable." />}</div>
+            </section>
+            <section className="inspector-two-column">
+              <div className="panel"><PanelHeading title="Recent commits" subtitle="Latest commits returned by GitHub." />{inspectedRepository.commits.length ? <div className="inspector-activity-list">{inspectedRepository.commits.map((commit) => <div key={commit.sha}><span className="inspector-activity-dot" /><div><a href={commit.url} target="_blank" rel="noreferrer">{commit.message || "Commit"}</a><small>{commit.author} · {commit.date ? formatAgo(commit.date) : "Date unavailable"}</small></div><code>{commit.shortSha}</code></div>)}</div> : <EmptyState title="No commits returned" description="The repository may be empty or history is unavailable." />}</div>
+              <div className="panel"><PanelHeading title="Recent workflow runs" subtitle={inspectedRepository.actions.totalRuns + " total Actions runs reported."} />{inspectedRepository.actions.runs.length ? <div className="inspector-activity-list">{inspectedRepository.actions.runs.map((run) => <div key={run.id}><span className={"inspector-run-dot " + (run.conclusion === "success" ? "good" : run.conclusion === "failure" ? "bad" : "")} /><div><a href={run.url} target="_blank" rel="noreferrer">{run.name}</a><small>{run.branch} · {formatAgo(run.createdAt)}</small></div><Status status={run.conclusion === "success" ? "Success" : run.conclusion === "failure" ? "Failed" : run.status === "in_progress" ? "In progress" : "Partial"} /></div>)}</div> : <EmptyState title="No workflow runs found" description="Actions may be disabled or no runs visible. This does not mean tests passed." />}</div>
+            </section>
+            <section className="inspector-two-column">
+              <div className="panel"><PanelHeading title={"Open issues (" + inspectedRepository.issues.length + ")"} subtitle="Sample of open issues." />{inspectedRepository.issues.length ? <div className="inspector-link-list">{inspectedRepository.issues.map((issue) => <a key={issue.number} href={issue.url} target="_blank" rel="noreferrer"><span>#{issue.number}</span><strong>{issue.title}</strong><small>{issue.author}</small></a>)}</div> : <EmptyState title="No issues in this sample" description="Issues may be disabled or none may be open." />}</div>
+              <div className="panel"><PanelHeading title={"Open pull requests (" + inspectedRepository.pullRequests.length + ")"} subtitle="Sample of open pull requests." />{inspectedRepository.pullRequests.length ? <div className="inspector-link-list">{inspectedRepository.pullRequests.map((pr) => <a key={pr.number} href={pr.url} target="_blank" rel="noreferrer"><span>#{pr.number}</span><strong>{pr.title}{pr.draft ? " · Draft" : ""}</strong><small>{pr.author} · updated {formatAgo(pr.updatedAt)}</small></a>)}</div> : <EmptyState title="No open pull requests in this sample" description="No visible open PRs were returned." />}</div>
+            </section>
+            <section className="panel"><PanelHeading title="README preview" subtitle={inspectedRepository.readme.name} action={<a className="text-button" href={inspectedRepository.readme.url} target="_blank" rel="noreferrer">View full README <Icon name="external" size={13} /></a>} />{inspectedRepository.readme.text ? <pre className="inspector-readme">{inspectedRepository.readme.text}</pre> : <EmptyState title="README preview unavailable" description="No README text was returned." />}<p className="inspector-disclaimer">{inspectedRepository.meta.limitations} · Data fetched {formatAgo(inspectedRepository.meta.generatedAt)}.</p></section>
+          </div>}
+        </section>}
         {active === "Benchmarks" && <section className="panel runs-panel"><PanelHeading title="Workflow performance comparison" subtitle="Compare actual workflows by recent outcome and deterministic score. This is not yet a controlled agent-vs-agent benchmark." /><div className="table-wrap"><table><thead><tr><th>Workflow</th><th>Runs</th><th>Average score</th><th>Success rate</th><th>Failures</th></tr></thead><tbody>{workflows.map((workflow) => <tr key={workflow.name}><td><strong className="agent-name">{workflow.name}</strong></td><td>{workflow.count}</td><td><strong className={workflow.average >= 85 ? "score-good" : workflow.average >= 70 ? "score-mid" : "score-bad"}>{workflow.average.toFixed(1)}</strong></td><td>{workflow.successRate.toFixed(1)}%</td><td>{workflow.failures}</td></tr>)}</tbody></table>{!loadingRuns && !runsError && workflows.length === 0 && <EmptyState title="No workflow data to compare" description="Workflow comparisons will appear when GitHub Actions runs are available." />}{runsError && <EmptyState title="Live comparison unavailable" description={runsError} />}</div></section>}
 
         {active === "Audit & Safety" && <><section className="metrics-grid"><Metric title="Failed workflows" value={String(visibleRuns.filter((run) => run.outcome === "failure").length)} note="Visible runs with failure outcomes" icon="alert" values={visibleRuns.map((run) => run.outcome === "failure" ? 100 : 0)} warning /><Metric title="Test evidence coverage" value={(visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.testEvidenceAvailable).length / visibleRuns.length * 100) : 0) + "%"} note="Runs with parsed test evidence" icon="check" values={visibleRuns.map((run) => run.testEvidenceAvailable ? 100 : 0)} /><Metric title="Diff evidence coverage" value={(visibleRuns.length ? Math.round(visibleRuns.filter((run) => run.diffEvidenceAvailable).length / visibleRuns.length * 100) : 0) + "%"} note="Runs with code-change evidence" icon="git" values={visibleRuns.map((run) => run.diffEvidenceAvailable ? 100 : 0)} warning /><Metric title="Runs with risk signals" value={visibleRuns.some((run) => run.diffEvidenceAvailable) ? String(visibleRuns.filter((run) => run.riskCount > 0).length) : "N/A"} note="Only meaningful when risk evidence exists" icon="shield" values={visibleRuns.map((run) => run.riskCount)} warning={!visibleRuns.some((run) => run.diffEvidenceAvailable)} /></section><section className="panel"><PanelHeading title="Safety evidence coverage" subtitle="Absence of evidence is not evidence of safety." /><p className="evidence-note"><Icon name="alert" size={16} /> The run list uses lightweight workflow metadata. Opening a run also attempts to collect commit-level file and line changes, dependency-file changes, and sensitive-path signals. Test reports and rollback evidence are not yet ingested, and missing diff evidence remains not assessed rather than safe.</p><RunsTable runs={visibleRuns.filter((run) => run.outcome !== "success" || !run.diffEvidenceAvailable)} loading={loadingRuns} error={runsError} onSelect={setSelectedRunId} /></section></>}
