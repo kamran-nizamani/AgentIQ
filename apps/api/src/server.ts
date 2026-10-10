@@ -139,7 +139,7 @@ export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
     }
 
     if (req.method !== "GET") {
-      res.setHeader("allow", "GET, POST");
+      res.setHeader("allow", "GET");
       json(res, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "This endpoint does not support the requested method." } });
       return;
     }
