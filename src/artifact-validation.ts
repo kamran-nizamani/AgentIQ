@@ -39,7 +39,7 @@ export function validateEvidenceArtifact(value: unknown, expected: ExpectedArtif
 
   if (workflowData) {
     if (workflowData.repository !== expected.repository) errors.push("Workflow repository does not match the requested repository.");
-    if (String(workflowData.workflowRunId ?? workflow.provenance.sourceId) !== expectedRunId) errors.push("Workflow run ID does not match the requested CI run.");
+    if (String(workflowData.workflowRunId ?? workflow?.provenance.sourceId) !== expectedRunId) errors.push("Workflow run ID does not match the requested CI run.");
     if (workflowData.commitSha !== expected.commitSha) errors.push("Workflow commit SHA does not match the requested commit.");
   }
 
