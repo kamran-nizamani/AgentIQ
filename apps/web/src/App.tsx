@@ -70,6 +70,7 @@ type RunRow = {
   riskAssessment: "not-assessed" | "assessed";
   scoreStatus: "verified" | "provisional";
   evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] };
+  artifactEvidence?: { status: "verified" | "unavailable" | "rejected"; errors: string[]; collectorRunId: string | null; repository: string | null; workflowRunId: string | null; commitSha: string | null; testSummary?: { framework: string; total: number; passed: number; failed: number; skipped: number } };
 };
 type ApiMeta = { source: string; repository: string; authenticated: boolean; generatedAt: string; note: string; storage?: "supabase" | "github-live" | "unavailable" };
 type RunsResponse = { data: RunRow[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: ApiMeta };
