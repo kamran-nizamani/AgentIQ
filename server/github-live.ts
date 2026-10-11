@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readZipTextMember } from "../src/artifact-zip.js";
+import { validateEvidenceArtifact } from "../src/artifact-validation.js";
 import { durableStorageConfigured, getStoredRunDetail, listStoredRunSummaries, saveRunDetail, saveRunSummaries } from "./durable-store.js";
 import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
 import { parseTestLogSummary } from "../src/test-log.js";
@@ -74,6 +77,7 @@ export type LiveRunRecord = {
   riskAssessment: "not-assessed" | "assessed";
   scoreStatus: "verified" | "provisional";
   evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] };
+  artifactEvidence?: { status: "verified" | "unavailable" | "rejected"; errors: string[]; collectorRunId: string | null; repository: string | null; workflowRunId: string | null; commitSha: string | null; testSummary?: { framework: string; total: number; passed: number; failed: number; skipped: number } };
 };
 
 export class GitHubLiveError extends Error {
@@ -238,6 +242,7 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
     riskAssessment: diffEvidenceAvailable ? "assessed" : "not-assessed",
     scoreStatus: evaluation.scoreStatus,
     evidenceCoverage: evaluation.evidenceCoverage,
+    artifactEvidence: { status: "unavailable", errors: ["No provenance-validated evidence artifact has been ingested for this run."], collectorRunId: null, repository: null, workflowRunId: null, commitSha: null },
   };
   return { ...record, evidence, evaluation };
 }
@@ -325,6 +330,55 @@ async function collectCommitEvidence(repository: string, raw: GitHubRunApi, evid
   }
 }
 
+type EvidenceCollectorRun = { id: number; head_sha: string; status: string; conclusion: string | null; path?: string; name?: string; created_at?: string };
+type EvidenceCollectorRunsResponse = { workflow_runs: EvidenceCollectorRun[] };
+type EvidenceArtifact = { id: number; name: string; expired: boolean; digest?: string | null; size_in_bytes?: number };
+
+async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<NonNullable<LiveRunRecord["artifactEvidence"]>> {
+  const base = "/repos/" + repository;
+  const expected = { repository, workflowRunId: raw.id, commitSha: raw.head_sha };
+  try {
+    const collectors = await githubGet<EvidenceCollectorRunsResponse>(
+      base + "/actions/workflows/agentiq-evidence.yml/runs?head_sha=" + encodeURIComponent(raw.head_sha) + "&per_page=20"
+    );
+    const collector = (collectors.workflow_runs || [])
+      .filter((run) => run.head_sha === raw.head_sha && run.status === "completed" && run.conclusion === "success")
+      .sort((a, b) => Date.parse(b.created_at || "") - Date.parse(a.created_at || ""))[0];
+    if (!collector) return { status: "unavailable", errors: ["No successful AgentIQ Evidence collector run was found for this exact commit."], collectorRunId: null, repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    const artifactResponse = await githubGet<{ artifacts: EvidenceArtifact[] }>(base + "/actions/runs/" + collector.id + "/artifacts?per_page=100");
+    const artifact = (artifactResponse.artifacts || []).find((item) => item.name === "agentiq-evidence" && !item.expired);
+    if (!artifact) return { status: "unavailable", errors: ["The evidence collector completed, but its agentiq-evidence artifact is missing or expired."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    if (typeof artifact.size_in_bytes === "number" && artifact.size_in_bytes > 10_000_000) {
+      return { status: "rejected", errors: ["Evidence artifact exceeds the 10 MB download limit."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    }
+    const token = process.env.GITHUB_TOKEN;
+    const headers: Record<string, string> = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AgentIQ" };
+    if (token) headers.Authorization = "Bearer " + token;
+    const response = await fetch("https://api.github.com" + base + "/actions/artifacts/" + artifact.id + "/zip", { headers, cache: "no-store", redirect: "follow" });
+    if (!response.ok) throw new GitHubLiveError("GitHub could not download the evidence artifact (HTTP " + response.status + ").", response.status === 403 ? 502 : 502);
+    const archive = new Uint8Array(await response.arrayBuffer());
+    if (archive.byteLength > 10_000_000) return { status: "rejected", errors: ["Downloaded evidence artifact exceeds the 10 MB limit."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    if (artifact.digest) {
+      const actual = "sha256:" + createHash("sha256").update(archive).digest("hex");
+      if (actual !== artifact.digest) return { status: "rejected", errors: ["Artifact SHA-256 digest does not match GitHub's artifact metadata."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    }
+    const json = readZipTextMember(archive, "agentiq-evidence.json");
+    if (!json) return { status: "rejected", errors: ["The artifact ZIP does not contain agentiq-evidence.json at its root."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    let parsed: unknown;
+    try { parsed = JSON.parse(json); } catch { return { status: "rejected", errors: ["Evidence artifact JSON is malformed."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha }; }
+    const validation = validateEvidenceArtifact(parsed, expected);
+    if (!validation.valid) return { status: "rejected", errors: validation.errors, collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, ...(validation.testSummary ? { testSummary: validation.testSummary } : {}) };
+    const bundle = parsed as EvidenceBundle;
+    const tests = bundle.evidence.find((item) => item.kind === "test-suite");
+    if (!tests || !validation.testSummary) return { status: "rejected", errors: ["Validated artifact did not contain a usable test-suite record."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    evidence.evidence.push(tests);
+    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: validation.testSummary };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Evidence artifact ingestion failed.";
+    return { status: "unavailable", errors: [message.slice(0, 300)], collectorRunId: null, repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+  }
+}
+
 export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evidence: EvidenceBundle; evaluation: ReturnType<typeof evaluateEvidence>; jobs: GitHubJobApi[] }> {
   if (!/^\d+$/.test(runId)) throw new GitHubLiveError("Run ID must be a numeric GitHub Actions run ID.", 400);
   const repository = configuredRepository();
@@ -341,7 +395,9 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   }
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
-  await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
+  const artifactEvidence = await collectArtifactTestEvidence(repository, raw, normalized.evidence);
+  normalized.artifactEvidence = artifactEvidence;
+  if (artifactEvidence.status !== "verified") await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
   await collectCommitEvidence(repository, raw, normalized.evidence);
   const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);
   refreshedRun.id = String(raw.id);
@@ -365,6 +421,9 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   normalized.scoreStatus = refreshedEvaluation.scoreStatus;
   normalized.evidenceCoverage = refreshedEvaluation.evidenceCoverage;
   normalized.evaluation = refreshedEvaluation;
+  if (artifactEvidence.status !== "verified" && artifactEvidence.errors.length) {
+    normalized.recommendations = [...normalized.recommendations, "Evidence artifact " + artifactEvidence.status + ": " + artifactEvidence.errors.join(" ")];
+  }
   const detail = { ...normalized, jobs: jobsPayload.jobs };
   if (durableStorageConfigured()) {
     try { await saveRunDetail(repository, runId, detail, normalized.storedAt); }
