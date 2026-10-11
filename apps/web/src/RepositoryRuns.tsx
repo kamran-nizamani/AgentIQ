@@ -12,7 +12,7 @@ type ListResponse = { data: { repository: string; total: number; page: number; p
 type RunDetail = {
   repository: string; run: RunRow;
   jobs: { available: boolean; total: number | null; items: Array<{ id: number; name: string; status: string; conclusion: string | null; url: string; startedAt: string | null; completedAt: string | null; runner: string | null; steps: Array<{ name: string; number: number; status: string; conclusion: string | null; startedAt: string | null; completedAt: string | null }> }> };
-  artifacts: { available: boolean; total: number | null; items: Array<{ id: number; name: string; sizeBytes: number; expired: boolean; createdAt: string; expiresAt: string }> };
+  artifacts: { available: boolean; total: number | null; items: Array<{ id: number; name: string; sizeBytes: number; expired: boolean; createdAt: string; expiresAt: string; downloadUrl: string; digest?: string | null }> };
   meta: { note: string };
 };
 type DetailResponse = { data: RunDetail };
@@ -46,6 +46,15 @@ function statusClass(status: string, conclusion: string | null): string {
 }
 function pretty(value: string | null): string { return value ? value.replace(/_/g, " ") : "pending"; }
 function bytes(value: number): string { return value < 1024 ? value + " B" : value < 1024 * 1024 ? (value / 1024).toFixed(1) + " KB" : (value / 1024 / 1024).toFixed(1) + " MB"; }
+function expiryLabel(value: string, expired: boolean): string {
+  if (expired) return "Expired";
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return "Expiry unavailable";
+  const days = Math.ceil((time - Date.now()) / 86400000);
+  if (days < 0) return "Expired";
+  if (days === 0) return "Expires today";
+  return "Expires in " + days + (days === 1 ? " day" : " days");
+}
 
 export default function RepositoryRuns({ repository }: { repository: string }) {
   const [page, setPage] = useState(1);
@@ -154,7 +163,7 @@ export default function RepositoryRuns({ repository }: { repository: string }) {
             </div>)}
             <div className="repo-run-detail-heading"><strong>Artifacts</strong><span>{detail.artifacts.total === null ? "Unavailable" : detail.artifacts.total + " artifacts"}</span></div>
             {!detail.artifacts.available && <p className="repo-run-muted">Artifact metadata was unavailable or the run has no accessible artifacts.</p>}
-            {detail.artifacts.items.length > 0 && <div className="repo-artifacts">{detail.artifacts.items.map((artifact) => <div key={artifact.id}><span>▧</span><div><strong>{artifact.name}</strong><small>{bytes(artifact.sizeBytes)} · {artifact.expired ? "Expired" : "Available"} · expires {ago(artifact.expiresAt)}</small></div></div>)}</div>}
+            {detail.artifacts.items.length > 0 && <div className="repo-artifacts">{detail.artifacts.items.map((artifact) => <div key={artifact.id} className="repo-artifact-row"><span className="repo-artifact-icon">▧</span><div className="repo-artifact-copy"><strong>{artifact.name}</strong><small>{bytes(artifact.sizeBytes)} · {expiryLabel(artifact.expiresAt, artifact.expired)}</small>{artifact.digest && <small className="repo-artifact-digest" title={artifact.digest}>SHA-256 · {artifact.digest.replace(/^sha256:/, "").slice(0, 16)}…</small>}</div>{!artifact.expired && <a className="repo-artifact-download" href={artifact.downloadUrl} target="_blank" rel="noreferrer" aria-label={"Download " + artifact.name}>Download ↗</a>}</div>)}</div>}
             <div className="repo-run-footer"><span>{detail.meta.note}</span><a href={detail.run.url} target="_blank" rel="noreferrer">Open full run on GitHub ↗</a></div>
           </>}
         </div>}
