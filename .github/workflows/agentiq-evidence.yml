@@ -14,44 +14,92 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
-      - run: npm test
-      - name: Emit workflow evidence
+      - name: Run tests and write a machine-readable report
+        run: npm test -- --reporter=json --outputFile=test-results.json
+      - name: Emit provenance-bound evidence
         env:
           AGENTIQ_RUN_ID: ${{ github.event.workflow_run.id }}
+          AGENTIQ_ARTIFACT_RUN_ID: ${{ github.run_id }}
           AGENTIQ_REPOSITORY: ${{ github.repository }}
           AGENTIQ_SHA: ${{ github.event.workflow_run.head_sha }}
           AGENTIQ_WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
           node --input-type=module <<'NODE'
-          const fs = await import("node:fs");
+          import fs from "node:fs";
+
+          const report = JSON.parse(fs.readFileSync("test-results.json", "utf8"));
+          const passed = Number(report.numPassedTests ?? 0);
+          const failed = Number(report.numFailedTests ?? 0);
+          const skipped = Number(report.numPendingTests ?? 0) + Number(report.numTodoTests ?? 0);
+          const total = passed + failed + skipped;
+          if (!Number.isInteger(total) || total <= 0 || passed + failed + skipped !== total) {
+            throw new Error("Vitest produced an incomplete or invalid test summary.");
+          }
+
+          const now = new Date().toISOString();
+          const repository = process.env.AGENTIQ_REPOSITORY;
+          const workflowRunId = String(process.env.AGENTIQ_RUN_ID);
+          const commitSha = process.env.AGENTIQ_SHA;
           const evidence = {
             schemaVersion: "1.0",
-            evidence: [{
-              id: "github-actions:run:" + process.env.AGENTIQ_RUN_ID,
-              kind: "workflow-run",
-              timestamp: new Date().toISOString(),
-              provenance: {
-                source: "github-actions",
-                sourceId: process.env.AGENTIQ_RUN_ID,
-                collectedAt: new Date().toISOString(),
-                schemaVersion: "1.0"
+            evidence: [
+              {
+                id: "github-actions:run:" + workflowRunId,
+                kind: "workflow-run",
+                timestamp: now,
+                provenance: {
+                  source: "github-actions",
+                  sourceId: workflowRunId,
+                  collectedAt: now,
+                  schemaVersion: "1.0"
+                },
+                data: {
+                  repository,
+                  workflowRunId,
+                  artifactRunId: process.env.AGENTIQ_ARTIFACT_RUN_ID,
+                  commitSha,
+                  workflowName: process.env.AGENTIQ_WORKFLOW,
+                  conclusion: "success"
+                }
               },
-              data: {
-                repository: process.env.AGENTIQ_REPOSITORY,
-                commitSha: process.env.AGENTIQ_SHA,
-                workflowName: process.env.AGENTIQ_WORKFLOW
+              {
+                id: "test-suite:vitest:" + workflowRunId,
+                kind: "test-suite",
+                timestamp: now,
+                provenance: {
+                  source: "test-report",
+                  sourceId: "vitest:" + workflowRunId + ":" + commitSha,
+                  collectedAt: now,
+                  schemaVersion: "1.0"
+                },
+                data: {
+                  repository,
+                  workflowRunId,
+                  commitSha,
+                  framework: "vitest",
+                  total,
+                  passed,
+                  failed,
+                  skipped
+                }
               }
-            }]
+            ]
           };
-          fs.writeFileSync("agentiq-evidence.json", JSON.stringify(evidence, null, 2));
+
+          fs.writeFileSync("agentiq-evidence.json", JSON.stringify(evidence, null, 2) + "\n");
+          console.log(JSON.stringify({ repository, workflowRunId, commitSha, tests: { total, passed, failed, skipped } }));
           NODE
       - uses: actions/upload-artifact@v4
         with:
           name: agentiq-evidence
-          path: agentiq-evidence.json
+          path: |
+            agentiq-evidence.json
+            test-results.json
           if-no-files-found: error
