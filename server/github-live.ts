@@ -77,6 +77,7 @@ export type LiveRunRecord = {
   riskAssessment: "not-assessed" | "assessed";
   scoreStatus: "verified" | "provisional";
   evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] };
+  artifactEvidence: { status: "verified" | "unavailable" | "rejected"; errors: string[]; collectorRunId: string | null; repository: string | null; workflowRunId: string | null; commitSha: string | null; testSummary?: { framework: string; total: number; passed: number; failed: number; skipped: number } };
 };
 
 export class GitHubLiveError extends Error {
@@ -241,6 +242,7 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
     riskAssessment: diffEvidenceAvailable ? "assessed" : "not-assessed",
     scoreStatus: evaluation.scoreStatus,
     evidenceCoverage: evaluation.evidenceCoverage,
+    artifactEvidence: { status: "unavailable", errors: ["No provenance-validated evidence artifact has been ingested for this run."], collectorRunId: null, repository: null, workflowRunId: null, commitSha: null },
   };
   return { ...record, evidence, evaluation };
 }
@@ -393,7 +395,9 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   }
   const jobsPayload = await githubGet<GitHubJobsResponse>("/repos/" + repository + "/actions/runs/" + runId + "/jobs?per_page=100");
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
-  await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
+  const artifactEvidence = await collectArtifactTestEvidence(repository, raw, normalized.evidence);
+  normalized.artifactEvidence = artifactEvidence;
+  if (artifactEvidence.status !== "verified") await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
   await collectCommitEvidence(repository, raw, normalized.evidence);
   const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);
   refreshedRun.id = String(raw.id);
@@ -417,6 +421,9 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   normalized.scoreStatus = refreshedEvaluation.scoreStatus;
   normalized.evidenceCoverage = refreshedEvaluation.evidenceCoverage;
   normalized.evaluation = refreshedEvaluation;
+  if (artifactEvidence.status !== "verified" && artifactEvidence.errors.length) {
+    normalized.recommendations = [...normalized.recommendations, "Evidence artifact " + artifactEvidence.status + ": " + artifactEvidence.errors.join(" ")];
+  }
   const detail = { ...normalized, jobs: jobsPayload.jobs };
   if (durableStorageConfigured()) {
     try { await saveRunDetail(repository, runId, detail, normalized.storedAt); }
