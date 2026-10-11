@@ -334,7 +334,7 @@ type EvidenceCollectorRun = { id: number; head_sha: string; status: string; conc
 type EvidenceCollectorRunsResponse = { workflow_runs: EvidenceCollectorRun[] };
 type EvidenceArtifact = { id: number; name: string; expired: boolean; digest?: string | null; size_in_bytes?: number };
 
-async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<LiveRunRecord["artifactEvidence"]> {
+async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi, evidence: EvidenceBundle): Promise<NonNullable<LiveRunRecord["artifactEvidence"]>> {
   const base = "/repos/" + repository;
   const expected = { repository, workflowRunId: raw.id, commitSha: raw.head_sha };
   try {
