@@ -77,7 +77,7 @@ describe("Engineering Intelligence API", () => {
     installGitHubMock();
     const result = await callHandler("/api/intelligence?repo=owner%2Frepo");
     expect(result.status).toBe(200);
-    expect(result.headers["cache-control"]).toBe("no-store");
+    expect(result.headers["Cache-Control"]).toBe("no-store");
     const repo = result.body.data[0].data;
     expect(repo.health).toMatchObject({ score: 100, coverage: 75 });
     expect(repo.security).toMatchObject({ available: false, openCount: null });
