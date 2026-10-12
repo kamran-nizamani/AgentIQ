@@ -16,6 +16,8 @@ export type { HistoricalSummary, TrendPoint } from "./analytics.js";
 export { summarizeEvaluations, toTrend } from "./analytics.js";
 export type { BenchmarkRun, BenchmarkEntry } from "./benchmark.js";
 export { rankAgents } from "./benchmark.js";
+export type { ControlledBenchmarkRun, BenchmarkControls, ControlledAgentSummary, ControlledBenchmarkComparison } from "./controlled-benchmark.js";
+export { compareControlledBenchmarks } from "./controlled-benchmark.js";
 export type { AgentAdapter } from "./adapters.js";
 export { FunctionAgentAdapter } from "./adapters.js";
 export type { GitHubApiCollectorOptions } from "./github-api.js";
