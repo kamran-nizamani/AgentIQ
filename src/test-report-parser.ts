@@ -113,7 +113,7 @@ function parseJestJson(content: string, framework: "jest" | "vitest"): ParsedTes
   const total = asCount(root.numTotalTests);
   const passed = asCount(root.numPassedTests);
   const failed = asCount(root.numFailedTests);
-  const skipped = asCount(root.numPendingTests) ?? asCount(root.numTodoTests) ?? 0;
+  const skipped = (asCount(root.numPendingTests) ?? 0) + (asCount(root.numTodoTests) ?? 0);
   if (total === null || passed === null || failed === null) {
     throw new Error("Jest/Vitest JSON requires numTotalTests, numPassedTests, and numFailedTests.");
   }
