@@ -68,7 +68,8 @@ export default function Intelligence() {
   const [tab, setTab] = useState<"overview" | "ci" | "reviews" | "security">("overview");
   const successful = useMemo(() => results.filter((result): result is Extract<Result, { ok: true }> => result.ok).map((result) => result.data), [results]);
   const totalFailures = successful.reduce((sum, repo) => sum + repo.ci.failures.length, 0);
-  const totalAlerts = successful.reduce((sum, repo) => sum + (repo.security.openCount || 0), 0);
+  const securityAvailableRepos = successful.filter((repo) => repo.security.available).length;
+  const totalAlerts = successful.reduce((sum, repo) => sum + (repo.security.available ? (repo.security.openCount ?? 0) : 0), 0);
   const totalReviewFindings = successful.reduce((sum, repo) => sum + repo.pullRequests.reviews.reduce((count, pr) => count + pr.findings.filter((finding) => finding.severity !== "info").length, 0), 0);
 
   async function inspect(event?: FormEvent<HTMLFormElement>) {
@@ -110,7 +111,7 @@ export default function Intelligence() {
       <section className="intel-summary-grid">
         <div className="panel intel-summary-card"><span>Repositories inspected</span><strong>{successful.length}<small>/{results.length}</small></strong><p>Successful inspections</p></div>
         <div className="panel intel-summary-card"><span>Recent CI failures</span><strong className={totalFailures ? "intel-danger-text" : ""}>{totalFailures}</strong><p>Across sampled recent runs</p></div>
-        <div className="panel intel-summary-card"><span>Security alerts</span><strong className={totalAlerts ? "intel-danger-text" : ""}>{successful.some((repo) => repo.security.available) ? totalAlerts : "N/A"}</strong><p>{successful.some((repo) => repo.security.available) ? "Alerts exposed by GitHub" : "Alert access unavailable"}</p></div>
+        <div className="panel intel-summary-card"><span>Security alerts</span><strong className={totalAlerts ? "intel-danger-text" : ""}>{securityAvailableRepos === 0 ? "N/A" : totalAlerts + (securityAvailableRepos < successful.length ? " *" : "")}</strong><p>{securityAvailableRepos === 0 ? "Alert access unavailable" : securityAvailableRepos + "/" + successful.length + " repos with alert access" + (securityAvailableRepos < successful.length ? " · partial total" : "")}</p></div>
         <div className="panel intel-summary-card"><span>PR review prompts</span><strong>{totalReviewFindings}</strong><p>Heuristic prompts, not confirmed bugs</p></div>
       </section>
       <section className="intel-tabs" role="tablist" aria-label="Intelligence views">
@@ -123,7 +124,8 @@ export default function Intelligence() {
         <div className="intel-health-track"><i style={{ width: (repo.health.score ?? 0) + "%" }} /></div>
         <div className="intel-repo-stats"><span>★ {repo.repository.stars.toLocaleString()}</span><span>{repo.repository.language || "Language unknown"}</span><span>{repo.repository.license}</span><span>{repo.repository.archived ? "Archived" : repo.maintenance.lastPushAgeDays === null ? "Push date unknown" : "Pushed " + repo.maintenance.lastPushAgeDays + "d ago"}</span></div>
         <div className="intel-coverage"><span>Evidence coverage</span><strong>{repo.health.coverage}%</strong></div>
-        <div className="intel-component-list">{repo.health.components.map((component) => <div key={component.key}><span>{component.label}<small>{component.detail}</small></span><strong className={component.score === null ? "muted" : component.score >= 80 ? "good" : component.score >= 60 ? "medium" : "bad"}>{component.score === null ? "N/A" : Math.round(component.score)}</strong></div>)}</div>
+        <p className="intel-note">Health score uses only available signals and renormalizes their weights. Missing evidence lowers coverage; it is not treated as a healthy result.</p>
+        <div className="intel-component-list">{repo.health.components.map((component) => <div key={component.key}><span>{component.label}<small>{component.weight}% base weight · {component.detail}</small></span><strong className={component.score === null ? "muted" : component.score >= 80 ? "good" : component.score >= 60 ? "medium" : "bad"}>{component.score === null ? "N/A" : Math.round(component.score)}</strong></div>)}</div>
         <div className="intel-card-footer"><span>{repo.ci.successRate === null ? "CI success rate unknown" : repo.ci.successRate + "% recent CI success"} · {repo.pullRequests.openCount === null ? "PR data unknown" : repo.pullRequests.openCount + " open PRs returned"}</span><button onClick={() => setTab("ci")}>Investigate signals →</button></div>
       </article>)}
       {results.filter((result) => !result.ok).map((result) => <article className="panel intel-repo-card intel-failed-card" key={result.input}><strong>{result.input}</strong><p>{result.error.message}</p></article>)}</div>}
