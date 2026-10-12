@@ -24,7 +24,7 @@ The score is a **heuristic triage aid**, not a certification. It renormalizes th
 | Project hygiene | 15% | README, license, and root test-folder signals |
 | PR hygiene | 10% | Open PR sample and age of last update |
 
-The API returns both the score and coverage. A score with low coverage should not be compared as if it had complete evidence. The current test-folder signal checks the root contents only and can miss tests in nested folders.
+The API returns both the score and coverage. A score with low coverage should not be compared as if it had complete evidence. The dashboard displays each component’s base weight and makes partial security-alert aggregates explicit; repositories where alert access is unavailable are excluded from the numeric alert sum and counted as missing coverage, not as zero alerts. The current test-folder signal checks the root contents only and can miss tests in nested folders.
 
 ## CI failure intelligence
 
