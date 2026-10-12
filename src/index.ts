@@ -26,3 +26,6 @@ export { ingestWorkflowRunSnapshot, ingestWorkflowJobSnapshot, ingestReviewSnaps
 
 export type { StoredAgentRun, AgentRunStore, RunHistoryQuery, RunHistoryRow } from "./storage.js";
 export { InMemoryAgentRunStore, toRunHistoryRow } from "./storage.js";
+
+export type { TestReportFormat, ParsedTestReport } from "./test-report-parser.js";
+export { parseTestReport } from "./test-report-parser.js";
