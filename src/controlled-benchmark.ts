@@ -60,6 +60,10 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
 function median(sorted: number[]): number {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0
@@ -71,13 +75,13 @@ function average(values: number[]): number | null {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
-function optionalMetric(values: Array<number | null | undefined>, field: string, max?: number): number | null {
+function optionalMetric(values: Array<number | null | undefined>, field: string, max?: number, round: (value: number) => number = round1): number | null {
   const present = values.filter((value): value is number => value !== null && value !== undefined);
   if (present.some((value) => !Number.isFinite(value) || value < 0 || (max !== undefined && value > max))) {
     throw new Error(field + " values must be finite and within the supported range.");
   }
   const result = average(present);
-  return result === null ? null : round1(result);
+  return result === null ? null : round(result);
 }
 
 function controlsFor(run: ControlledBenchmarkRun): BenchmarkControls {
@@ -147,7 +151,7 @@ export function compareControlledBenchmarks(runs: ControlledBenchmarkRun[]): Con
         scoreStdDev: round1(Math.sqrt(variance)),
         taskSuccessRate: round1(agentRuns.filter((run) => run.taskOutcome === "success").length / agentRuns.length * 100),
         averageDurationMs: optionalMetric(agentRuns.map((run) => run.durationMs), "durationMs"),
-        averageCostUsd: optionalMetric(agentRuns.map((run) => run.costUsd), "costUsd"),
+        averageCostUsd: optionalMetric(agentRuns.map((run) => run.costUsd), "costUsd", undefined, round4),
         averageTestPassRate: optionalMetric(agentRuns.map((run) => run.testPassRate), "testPassRate", 100),
         provisional: agentRuns.length < 5,
       };
