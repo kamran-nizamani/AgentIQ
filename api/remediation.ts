@@ -101,7 +101,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         github<{ workflow_runs: Run[] }>(base + "/actions/runs?per_page=10"),
         github<Comment[]>(base + "/issues/" + pullNumber + "/comments?per_page=100"),
       ]);
-      const matchingRuns = runs.workflow_runs.filter((run) => !run.head_sha || !pull.head?.sha || run.head_sha === pull.head.sha);
+      const matchingRuns = pull.head?.sha ? runs.workflow_runs.filter((run) => run.head_sha === pull.head?.sha) : [];
       const evidence = buildDiffEvidence(files, matchingRuns);
       send(res, 200, {
         data: {
