@@ -1113,3 +1113,41 @@ a:hover { color: #c2fff0; }
 .intel-approval button:disabled { opacity: .45; cursor: not-allowed; }
 .intel-approval .intel-approved-status { color: var(--accent); font-weight: 600; }
 .intel-finding small a { color: var(--accent); text-decoration: underline; }
+
+
+/* Real PR diff evidence and persistent human-review audit */
+.intel-real-evidence { margin: 14px 0 18px; }
+.intel-real-evidence > button { min-height: 38px; }
+.intel-real-evidence-panel { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); display: grid; gap: 14px; min-width: 0; }
+.intel-real-evidence-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.intel-real-evidence-heading p { margin: 5px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.intel-real-evidence-heading a, .intel-test-evidence a, .intel-audit-history a { color: var(--accent, #8b8cff); }
+.intel-evidence-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.intel-evidence-stats span { padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+.intel-diff-file-list { display: grid; gap: 8px; min-width: 0; }
+.intel-diff-file { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.intel-diff-file summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; cursor: pointer; padding: 10px 12px; background: var(--panel-2, rgba(127,127,127,.06)); }
+.intel-diff-file summary code { overflow-wrap: anywhere; }
+.intel-diff-file summary span { color: var(--muted); font-size: 12px; }
+.intel-diff-file pre { margin: 0; padding: 12px; max-height: 360px; overflow: auto; background: rgba(0,0,0,.2); color: var(--text, inherit); font-size: 12px; line-height: 1.55; white-space: pre; tab-size: 2; }
+.intel-test-evidence, .intel-generated-proposals, .intel-persistent-audit { display: grid; gap: 9px; min-width: 0; }
+.intel-test-evidence h4, .intel-generated-proposals h4, .intel-persistent-audit h4 { margin: 5px 0 0; }
+.intel-test-evidence p { margin: 0; overflow-wrap: anywhere; }
+.intel-proposal-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.intel-proposal-choice input, .intel-audit-check input { margin-top: 4px; flex: 0 0 auto; }
+.intel-proposal-choice > span { display: grid; gap: 6px; min-width: 0; }
+.intel-proposal-choice small { color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.intel-persistent-audit > label:not(.intel-audit-check) { display: grid; gap: 6px; font-size: 13px; }
+.intel-persistent-audit input[type="password"], .intel-persistent-audit textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--background, transparent); color: inherit; font: inherit; }
+.intel-audit-check { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.intel-audit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.intel-audit-history { display: grid; gap: 8px; }
+.intel-audit-history article { padding: 12px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.intel-audit-history article strong, .intel-audit-history article small { display: block; }
+.intel-audit-history article small { margin-top: 5px; color: var(--muted); overflow-wrap: anywhere; }
+.intel-audit-history article p { margin: 8px 0 0; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .intel-real-evidence-panel { padding: 11px; }
+  .intel-diff-file pre { max-height: 280px; font-size: 11px; }
+  .intel-audit-actions > button { flex: 1 1 100%; }
+}
