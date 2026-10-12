@@ -4,6 +4,7 @@ import { validateEvidenceArtifact } from "../src/artifact-validation.js";
 import { durableStorageConfigured, getStoredRunDetail, listStoredRunSummaries, saveRunDetail, saveRunSummaries } from "./durable-store.js";
 import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
 import { parseTestLogSummary } from "../src/test-log.js";
+import { parseTestReport } from "../src/test-report-parser.js";
 import { evaluateEvidence } from "../src/evaluation.js";
 import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot, type GitHubWorkflowJobSnapshot, type GitHubWorkflowRunSnapshot } from "../src/github-ci.js";
 import { evidenceBundleToAgentRun } from "../src/normalize.js";
@@ -376,11 +377,23 @@ async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi
     try { parsed = JSON.parse(json); } catch { return { status: "rejected", errors: ["Evidence artifact JSON is malformed."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha }; }
     const validation = validateEvidenceArtifact(parsed, expected);
     if (!validation.valid) return { status: "rejected", errors: validation.errors, collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, ...(validation.testSummary ? { testSummary: validation.testSummary } : {}) };
+    const rawReport = readZipTextMember(archive, "test-results.json");
+    if (!rawReport) return { status: "rejected", errors: ["Evidence artifact is missing raw test-results.json."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    let report;
+    try { report = parseTestReport(rawReport, "vitest-json"); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : "Raw test report is invalid.";
+      return { status: "rejected", errors: ["Raw test report rejected: " + message.slice(0, 200)], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    }
     const bundle = parsed as EvidenceBundle;
     const tests = bundle.evidence.find((item) => item.kind === "test-suite");
     if (!tests || !validation.testSummary) return { status: "rejected", errors: ["Validated artifact did not contain a usable test-suite record."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
+    if (report.total !== validation.testSummary.total || report.passed !== validation.testSummary.passed ||
+        report.failed !== validation.testSummary.failed || report.skipped !== validation.testSummary.skipped) {
+      return { status: "rejected", errors: ["Raw test report counts do not match the provenance-bound evidence summary."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: validation.testSummary };
+    }
     evidence.evidence.push(tests);
-    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: validation.testSummary };
+    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: { framework: report.framework, total: report.total, passed: report.passed, failed: report.failed, skipped: report.skipped } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Evidence artifact ingestion failed.";
     return { status: "unavailable", errors: [message.slice(0, 300)], collectorRunId: null, repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
