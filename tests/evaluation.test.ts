@@ -36,6 +36,13 @@ describe("evidence-aware evaluation", () => {
     expect(report.evaluation.breakdown.tests).toBe(50);
     expect(report.evaluation.score).toBe(99);
     expect(report.evaluation.recommendations.join(" ")).toContain("provisional");
+    expect(report.scoreExplanation).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "tests", score: null, available: false, appliedWeight: 0, contribution: 0 }),
+      expect.objectContaining({ key: "safety", score: null, available: false, appliedWeight: 0, contribution: 0 }),
+    ]));
+    const explainedScore = report.scoreExplanation.reduce((sum, dimension) => sum + dimension.contribution, 0);
+    expect(Math.round(explainedScore)).toBe(report.evaluation.score);
+    expect(report.scoreExplanation.find((dimension) => dimension.key === "outcome")?.appliedWeight).toBeCloseTo(58.33);
   });
 
   it("verifies scores when both test and diff evidence are present", () => {
@@ -46,6 +53,8 @@ describe("evidence-aware evaluation", () => {
     ]), { ...run, tests: { total: 10, passed: 10, failed: 0 } });
     expect(report.scoreStatus).toBe("verified");
     expect(report.evidenceCoverage).toMatchObject({ tests: true, safety: true, provisional: false, missing: [] });
+    expect(report.scoreExplanation.every((dimension) => dimension.available)).toBe(true);
+    expect(report.scoreExplanation.reduce((sum, dimension) => sum + dimension.appliedWeight, 0)).toBeCloseTo(100);
   });
 
   it("keeps a score provisional if only one evidence dimension is available", () => {

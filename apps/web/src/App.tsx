@@ -40,6 +40,7 @@ const navigation = [
 ];
 
 type Breakdown = { outcome: number; tests: number; efficiency: number; autonomy: number; safety: number };
+type ScoreDimensionExplanation = { key: "outcome" | "tests" | "efficiency" | "autonomy" | "safety"; label: string; score: number | null; baseWeight: number; appliedWeight: number; contribution: number; available: boolean; reason: string };
 type RunRow = {
   runId: string;
   repository: string;
@@ -75,7 +76,7 @@ type RunRow = {
 type ApiMeta = { source: string; repository: string; authenticated: boolean; generatedAt: string; note: string; storage?: "supabase" | "github-live" | "unavailable" };
 type RunsResponse = { data: RunRow[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean }; meta: ApiMeta };
 type EvidenceItem = { id: string; kind: string; timestamp: string; provenance: { source: string; sourceId: string; collectedAt: string }; data: Record<string, unknown> };
-type RunDetail = RunRow & { evidence: { schemaVersion: string; evidence: EvidenceItem[] }; evaluation: { evaluation: { score: number; grade: string; breakdown: Breakdown; recommendations: string[] }; policy: { id: string }; scoreStatus: "verified" | "provisional"; evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] }; riskSignals: Array<{ type?: string; category?: string; severity?: string; message?: string }> }; jobs: Array<{ id: number; name: string; status: string; conclusion: string | null; started_at?: string | null; completed_at?: string | null; html_url?: string }> };
+type RunDetail = RunRow & { evidence: { schemaVersion: string; evidence: EvidenceItem[] }; evaluation: { evaluation: { score: number; grade: string; breakdown: Breakdown; recommendations: string[] }; policy: { id: string }; scoreStatus: "verified" | "provisional"; evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] }; scoreExplanation?: ScoreDimensionExplanation[]; riskSignals: Array<{ type?: string; category?: string; severity?: string; message?: string }> }; jobs: Array<{ id: number; name: string; status: string; conclusion: string | null; started_at?: string | null; completed_at?: string | null; html_url?: string }> };
 type RepositoryInspection = {
   repository: { name: string; fullName: string; url: string; description: string | null; visibility: string; fork: boolean; archived: boolean; defaultBranch: string; primaryLanguage: string | null; stars: number; watchers: number; forks: number; openIssues: number; sizeKb: number; createdAt: string; updatedAt: string; pushedAt: string | null; license: string; topics: string[]; owner: { login: string; avatarUrl: string; url: string } };
   languages: Array<{ name: string; bytes: number }>;
@@ -342,6 +343,16 @@ function App() {
             <div className="detail-summary"><ScoreRing score={selectedRun.score} /><div><strong>{selectedRun.score}/100 · Grade {selectedRun.grade}{(selectedRun.scoreStatus === "provisional" || !selectedRun.testEvidenceAvailable || !selectedRun.diffEvidenceAvailable) ? " · Provisional" : " · Evidence verified"}</strong><span><Status status={outcomeLabel(selectedRun.outcome)} /> · {formatDuration(selectedRun.durationMs)}</span><p>{selectedRun.task}</p><a href={selectedRun.url} target="_blank" rel="noreferrer">Open run in GitHub <Icon name="external" size={13} /></a></div></div>
             <div className="detail-grid"><div><small>Branch</small><strong>{selectedRun.branch || "Unknown"}</strong></div><div><small>Commit</small><strong>{selectedRun.commitSha.slice(0, 12) || "Unknown"}</strong></div><div><small>Test evidence</small><strong>{selectedRun.testEvidenceAvailable ? selectedRun.tests.total + " tests" : "Missing · provisional"}</strong></div><div><small>Diff risk</small><strong>{selectedRun.diffEvidenceAvailable ? selectedRun.riskCount + " signals" : "Missing · provisional"}</strong></div></div>
             <h3 className="detail-section-title">Score breakdown</h3><div className="breakdown-list"><Breakdown label="Outcome" score={selectedRun.breakdown.outcome} weight="35%" /><Breakdown label="Tests" score={selectedRun.testEvidenceAvailable ? selectedRun.breakdown.tests : null} weight="30%" /><Breakdown label="Efficiency" score={selectedRun.breakdown.efficiency} weight="15%" /><Breakdown label="Autonomy" score={selectedRun.breakdown.autonomy} weight="10%" /><Breakdown label="Safety" score={selectedRun.diffEvidenceAvailable ? selectedRun.breakdown.safety : null} weight="10%" /></div>
+            <h3 className="detail-section-title">How this score was calculated</h3>
+            <p className="evidence-note">Available evidence is reweighted to 100%. Missing dimensions contribute nothing and are not interpreted as a pass, failure, or safety approval. Contributions below add up to the displayed score (rounding may cause a 1-point difference).</p>
+            {selectedRun.evaluation.scoreExplanation ? <div className="score-explanation-list">
+              {selectedRun.evaluation.scoreExplanation.map((dimension) => <div className={"score-explanation-row" + (!dimension.available ? " unavailable" : "")} key={dimension.key}>
+                <div><strong>{dimension.label}</strong><small>{dimension.available ? dimension.score + "/100 score" : "Not assessed"} · base weight {dimension.baseWeight}%</small></div>
+                <div><span>Applied weight</span><strong>{dimension.appliedWeight.toFixed(2)}%</strong></div>
+                <div><span>Score contribution</span><strong>{dimension.available ? dimension.contribution.toFixed(2) : "—"}</strong></div>
+                <p>{dimension.reason}</p>
+              </div>)}
+            </div> : <p className="evidence-note">Detailed score-contribution data is unavailable for this historical record.</p>}
             {!selectedRun.testEvidenceAvailable && <p className="evidence-note"><Icon name="alert" size={15} /> No parsed test report was found. The test dimension is excluded from the weighted score and shown as unavailable; this is not a claim that tests passed.</p>}
             {!selectedRun.diffEvidenceAvailable && <p className="evidence-note"><Icon name="shield" size={15} /> Code-diff evidence is missing. The safety dimension is excluded from the weighted score and shown as unavailable; zero detected signals must not be interpreted as safe.</p>}
             <h3 className="detail-section-title">CI artifact verification</h3>
