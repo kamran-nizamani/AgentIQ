@@ -709,9 +709,13 @@ AgentIQ can show whether an agent is improving or degrading over time.
 
 # Phase 5 — Agent Benchmarking
 
-**Status: ⚪ Planned**
+**Status: 🟡 Partial — descriptive summaries implemented; controlled comparisons remain planned**
 
 Goal: compare agents fairly on the same engineering tasks.
+
+The core library now summarizes observed scores with mean, median, score spread, min/max, deterministic ranking, and explicit sample-size labels. One to four runs are marked provisional. The legacy `successRate` field means the share of scores at or above 60/100; it is not a measured task-success rate. See [Benchmark methodology](docs/benchmark-methodology.md).
+
+The dashboard's workflow comparison is descriptive, not a controlled agent-vs-agent leaderboard. Same-task, same-base-commit, same-environment and policy-version controls are still required.
 
 ### Comparisons
 
