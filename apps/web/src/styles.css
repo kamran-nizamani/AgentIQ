@@ -1088,3 +1088,11 @@ a:hover { color: #c2fff0; }
   .score-explanation-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .score-explanation-row > div:nth-child(3) { grid-column: 1 / -1; }
 }
+
+
+/* Remediation plan export actions */
+.intel-plan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 560px) {
+  .intel-plan-actions { width: 100%; }
+  .intel-plan-actions button { flex: 1; }
+}
