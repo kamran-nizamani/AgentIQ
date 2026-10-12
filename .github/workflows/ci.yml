@@ -14,6 +14,10 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Report dependency audit findings
+        run: |
+          npm audit --json > /tmp/agentiq-npm-audit.json || true
+          node -e "const a=require('/tmp/agentiq-npm-audit.json'); const v=Object.entries(a.vulnerabilities||{}).map(([name,item])=>({name,severity:item.severity,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range,severity:x.severity})})); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities,vulnerabilities:v},null,2))"
       - run: npm run typecheck
       - run: npm run api:typecheck
       - run: npm run web:typecheck
