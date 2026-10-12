@@ -101,9 +101,12 @@ function controlsFor(run: ControlledBenchmarkRun): BenchmarkControls {
  */
 export function compareControlledBenchmarks(runs: ControlledBenchmarkRun[]): ControlledBenchmarkComparison[] {
   const cohorts = new Map<string, { controls: BenchmarkControls; runs: ControlledBenchmarkRun[] }>();
+  const seenRunIds = new Set<string>();
 
   for (const run of runs) {
-    requireText(run.runId, "runId");
+    const runId = requireText(run.runId, "runId");
+    if (seenRunIds.has(runId)) throw new Error("Duplicate runId is not allowed in a controlled benchmark.");
+    seenRunIds.add(runId);
     requireText(run.agentId, "agentId");
     requireText(run.modelId, "modelId");
     requireText(run.configId, "configId");
