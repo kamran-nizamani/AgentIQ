@@ -59,8 +59,9 @@ function downloadCsv(results: Result[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function downloadPlan(plan: { title: string; steps: string[] }) {
-  const blob = new Blob([formatRemediationPlanMarkdown(plan)], { type: "text/markdown;charset=utf-8" });
+function downloadPlan(plan: RemediationPlan) {
+  const safetyChecks = planCheckLabels.map((item) => (plan.checks[item.key] ? "[x] " : "[ ] ") + item.label);
+  const blob = new Blob([formatRemediationPlanMarkdown({ ...plan, safetyChecks })], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
