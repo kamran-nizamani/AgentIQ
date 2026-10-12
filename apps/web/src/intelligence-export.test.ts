@@ -11,7 +11,7 @@ describe("formatCsv", () => {
   });
 
   it("neutralizes spreadsheet formula prefixes in untrusted values", () => {
-    expect(formatCsv([{ title: '=HYPERLINK("https://example.com")' }, { title: "  @SUM(A1:A2)" }, { title: "-1" }])).toBe('title\r\n\'=HYPERLINK(""https://example.com"")\r\n\'  @SUM(A1:A2)\r\n\'-1\r\n');
+    expect(formatCsv([{ title: '=HYPERLINK("https://example.com")' }, { title: "  @SUM(A1:A2)" }, { title: "-1" }])).toBe('title\r\n"\'=HYPERLINK(""https://example.com"")"\r\n\'  @SUM(A1:A2)\r\n\'-1\r\n');
   });
 
   it("returns an empty string for no rows", () => {
