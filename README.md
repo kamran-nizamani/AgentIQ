@@ -715,7 +715,7 @@ Goal: compare agents fairly on the same engineering tasks.
 
 The core library now summarizes observed scores with mean, median, score spread, min/max, deterministic ranking, and explicit sample-size labels. One to four runs are marked provisional. The legacy `successRate` field means the share of scores at or above 60/100; it is not a measured task-success rate. See [Benchmark methodology](docs/benchmark-methodology.md).
 
-The dashboard's workflow comparison is descriptive, not a controlled agent-vs-agent leaderboard. Same-task, same-base-commit, same-environment and policy-version controls are still required.
+The dashboard's workflow comparison is descriptive, not a controlled agent-vs-agent leaderboard. The core library now also exposes `compareControlledBenchmarks`, which groups runs only when task, repository, base commit, test suite, environment, and scoring policy match. It marks low-sample results provisional; statistical significance and causal comparisons remain out of scope. See [controlled benchmark cohorts](docs/controlled-benchmarks.md).
 
 ### Comparisons
 
