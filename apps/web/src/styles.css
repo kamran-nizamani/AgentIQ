@@ -1070,3 +1070,21 @@ a:hover { color: #c2fff0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+/* Transparent score math */
+.score-explanation-list { display: grid; gap: 8px; margin: 12px 0 18px; }
+.score-explanation-row {
+  display: grid; grid-template-columns: minmax(120px,1.2fr) minmax(90px,.7fr) minmax(110px,.8fr);
+  gap: 10px; align-items: center; padding: 13px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.018);
+}
+.score-explanation-row > div { display: grid; gap: 4px; }
+.score-explanation-row strong { color: var(--text); font-size: 11px; font-weight: 650; }
+.score-explanation-row small, .score-explanation-row span { color: var(--muted); font-size: 9px; }
+.score-explanation-row p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.score-explanation-row.unavailable { border-style: dashed; opacity: .85; }
+@media (max-width: 560px) {
+  .score-explanation-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .score-explanation-row > div:nth-child(3) { grid-column: 1 / -1; }
+}
