@@ -4,6 +4,7 @@ import { validateEvidenceArtifact } from "../src/artifact-validation.js";
 import { durableStorageConfigured, getStoredRunDetail, listStoredRunSummaries, saveRunDetail, saveRunSummaries } from "./durable-store.js";
 import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
 import { parseTestLogSummary } from "../src/test-log.js";
+import { parseTestReport } from "../src/test-report-parser.js";
 import { evaluateEvidence } from "../src/evaluation.js";
 import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot, type GitHubWorkflowJobSnapshot, type GitHubWorkflowRunSnapshot } from "../src/github-ci.js";
 import { evidenceBundleToAgentRun } from "../src/normalize.js";
