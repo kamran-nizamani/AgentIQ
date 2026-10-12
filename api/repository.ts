@@ -48,7 +48,7 @@ async function githubGet<T>(path: string): Promise<T> {
     "User-Agent": "AgentIQ-Repository-Inspector",
   };
   if (process.env.GITHUB_TOKEN) headers.Authorization = "Bearer " + process.env.GITHUB_TOKEN;
-  const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store" });
+  const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store", signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
     const status = response.status === 404 ? 404 : response.status === 403 || response.status === 429 ? 429 : 502;
     throw { status, message: status === 404
