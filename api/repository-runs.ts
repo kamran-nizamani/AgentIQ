@@ -44,7 +44,7 @@ function parseRepo(input: string): { owner: string; repo: string; fullName: stri
 async function github<T>(path: string): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AgentIQ-Repository-Runs" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = "Bearer " + process.env.GITHUB_TOKEN;
-  const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store" });
+  const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store", signal: AbortSignal.timeout(10_000) });
   if (!response.ok) {
     const failure: ApiFailure = {
       status: response.status === 404 ? 404 : response.status === 403 || response.status === 429 ? 429 : 502,
