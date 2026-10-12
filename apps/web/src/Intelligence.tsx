@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatRemediationPlanMarkdown } from "./remediation-plan.js";
+import { formatCsv } from "./intelligence-export.js";
 
 type Finding = { severity: "high" | "medium" | "info"; title: string; detail: string; recommendation: string; evidence: string };
 type HealthComponent = { key: string; label: string; score: number | null; weight: number; detail: string };
@@ -33,6 +34,28 @@ function downloadJson(data: unknown) {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+
+function downloadCsv(results: Result[]) {
+  const rows: Array<Record<string, string | number | boolean | null | undefined>> = [];
+  for (const result of results) {
+    if (!result.ok) continue;
+    const repo = result.data;
+    for (const failure of repo.ci.failures) rows.push({ repository: repo.repository.fullName, category: "CI failure", severity: failure.conclusion === "failure" ? "high" : "info", title: failure.name, details: `${failure.status} / ${failure.conclusion ?? "no conclusion"} · branch ${failure.branch}`, recommendation: "Open the workflow run and inspect failed jobs and steps.", evidence: failure.createdAt, url: failure.url });
+    for (const pr of repo.pullRequests.reviews) for (const finding of pr.findings) rows.push({ repository: repo.repository.fullName, category: "Pull request review", severity: finding.severity, title: finding.title, details: finding.detail, recommendation: finding.recommendation, evidence: finding.evidence, url: pr.url });
+    for (const alert of repo.security.alerts) rows.push({ repository: repo.repository.fullName, category: "Dependency alert", severity: alert.severity, title: alert.summary || alert.packageName, details: `Package: ${alert.packageName}; manifest: ${alert.manifestPath}`, recommendation: alert.patchedVersion ? `Upgrade to ${alert.patchedVersion} or later and verify compatibility.` : "Review the advisory and determine a supported remediation.", evidence: alert.state, url: alert.url });
+  }
+  const csv = formatCsv(rows.length ? rows : [{ repository: "", category: "No findings", severity: "", title: "No CI failures, review findings, or security alerts were present in the sampled evidence.", details: "", recommendation: "", evidence: "", url: "" }]);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "agentiq-intelligence-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function downloadPlan(plan: { title: string; steps: string[] }) {
@@ -117,6 +140,7 @@ export default function Intelligence() {
       <section className="intel-tabs" role="tablist" aria-label="Intelligence views">
         {([{id:"overview",label:"Health & comparison"},{id:"ci",label:"CI failure intelligence"},{id:"reviews",label:"PR review assistant"},{id:"security",label:"Security & dependencies"}] as const).map((item) => <button key={item.id} role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}>{item.label}</button>)}
         <button className="intel-export" onClick={() => downloadJson(results)}>Export JSON report</button>
+        <button className="intel-export" onClick={() => downloadCsv(results)}>Export CSV findings</button>
       </section>
 
       {tab === "overview" && <div className="intel-repo-grid">{successful.map((repo) => <article className="panel intel-repo-card" key={repo.repository.fullName}>
