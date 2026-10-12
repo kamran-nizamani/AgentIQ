@@ -46,6 +46,9 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
   if (!body || typeof body !== "object" || Array.isArray(body)) throw { status: 400, message: "Request body must be a JSON object." } satisfies Failure;
   return body as Record<string, unknown>;
 }
+async function optional<T>(promise: Promise<T>): Promise<T | null> {
+  try { return await promise; } catch { return null; }
+}
 async function github<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw { status: 503, message: "GitHub integration is not configured on the server." } satisfies Failure;
@@ -95,13 +98,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const pullNumber = parsePullNumber(url.searchParams.get("pr"));
     const base = githubPath(repository.owner, repository.name, "");
     if (req.method === "GET") {
-      const [pull, files, runs, comments] = await Promise.all([
+      const [pull, files, runsResult, comments] = await Promise.all([
         github<Pull>(base + "/pulls/" + pullNumber),
         github<PullFile[]>(base + "/pulls/" + pullNumber + "/files?per_page=100"),
-        github<{ workflow_runs: Run[] }>(base + "/actions/runs?per_page=10"),
+        optional(github<{ workflow_runs: Run[] }>(base + "/actions/runs?per_page=10")),
         github<Comment[]>(base + "/issues/" + pullNumber + "/comments?per_page=100"),
       ]);
-      const matchingRuns = pull.head?.sha ? runs.workflow_runs.filter((run) => run.head_sha === pull.head?.sha) : [];
+      const matchingRuns = pull.head?.sha && runsResult ? runsResult.workflow_runs.filter((run) => run.head_sha === pull.head?.sha) : [];
       const evidence = buildDiffEvidence(files, matchingRuns);
       send(res, 200, {
         data: {
