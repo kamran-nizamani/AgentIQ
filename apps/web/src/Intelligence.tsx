@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { formatRemediationPlanMarkdown } from "./remediation-plan.js";
+import { scoreRemediationPriority, type RemediationPriority } from "./remediation-priority.js";
 import { formatCsv } from "./intelligence-export.js";
 
 type Finding = { severity: "high" | "medium" | "info"; title: string; detail: string; recommendation: string; evidence: string };
@@ -73,13 +74,35 @@ function downloadPlan(plan: { title: string; steps: string[] }) {
 
 function safePlan(title: string, recommendation: string, evidence: string): string[] {
   return [
-    "Inspect the linked source and confirm the finding applies to this repository.",
+    "Open the linked source and verify that the finding applies to the exact repository, branch, and affected version.",
+    "Reproduce the issue or confirm the advisory before changing code; record expected behaviour and a regression test.",
     recommendation,
-    "Create a focused branch and make the smallest reversible change; do not edit production directly.",
-    "Run the repository's existing tests, lint, build, and relevant security checks in an isolated environment.",
-    "Review the resulting diff and CI evidence, then request human approval before opening or merging a remediation PR.",
+    "Create a focused branch and apply the smallest reversible patch. Do not edit production directly or execute untrusted code.",
+    "Run focused regression tests, the full test suite, lint, typecheck, build, and relevant dependency/security checks.",
+    "Review the complete diff for unrelated changes, secrets, unsafe commands, and scope creep; confirm CI is green before asking for approval.",
     "Evidence observed: " + evidence,
   ];
+}
+
+type PlanCheck = "evidenceReviewed" | "testsDefined" | "rollbackDefined" | "diffReviewed";
+type RemediationPlan = {
+  title: string;
+  proposal: string;
+  steps: string[];
+  priority: RemediationPriority;
+  evidenceUrl: string;
+  evidenceLabel: string;
+  checks: Record<PlanCheck, boolean>;
+  approved: boolean;
+};
+const planCheckLabels: Array<{ key: PlanCheck; label: string }> = [
+  { key: "evidenceReviewed", label: "I opened and verified the linked source evidence." },
+  { key: "testsDefined", label: "A focused regression test and validation commands are defined." },
+  { key: "rollbackDefined", label: "The patch is scoped to a branch and has a rollback path." },
+  { key: "diffReviewed", label: "The diff and CI results have been reviewed; no unrelated changes are present." },
+];
+function isHttpUrl(value: string): boolean {
+  return /^https:\/\//i.test(value.trim());
 }
 
 function matchesSearch(values: Array<string | number | null | undefined>, query: string): boolean {
@@ -100,7 +123,7 @@ export default function Intelligence() {
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [plan, setPlan] = useState<{ title: string; steps: string[] } | null>(null);
+  const [plan, setPlan] = useState<RemediationPlan | null>(null);
   const [tab, setTab] = useState<"overview" | "ci" | "reviews" | "security">("overview");
   const [findingSearch, setFindingSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState<"all" | "high" | "medium" | "info">("all");
@@ -109,6 +132,20 @@ export default function Intelligence() {
   const securityAvailableRepos = successful.filter((repo) => repo.security.available).length;
   const totalAlerts = successful.reduce((sum, repo) => sum + (repo.security.available ? (repo.security.openCount ?? 0) : 0), 0);
   const totalReviewFindings = successful.reduce((sum, repo) => sum + repo.pullRequests.reviews.reduce((count, pr) => count + pr.findings.filter((finding) => finding.severity !== "info").length, 0), 0);
+
+  function buildPlan(title: string, proposal: string, evidence: string, severity: string, category: "ci" | "security" | "review" | "maintenance", evidenceUrl: string, evidenceLabel: string) {
+    const validEvidenceUrl = isHttpUrl(evidenceUrl) ? evidenceUrl : "";
+    setPlan({
+      title,
+      proposal,
+      steps: safePlan(title, proposal, evidence),
+      priority: scoreRemediationPriority({ severity, category, evidenceAvailable: Boolean(validEvidenceUrl) }),
+      evidenceUrl: validEvidenceUrl,
+      evidenceLabel,
+      checks: { evidenceReviewed: false, testsDefined: false, rollbackDefined: false, diffReviewed: false },
+      approved: false,
+    });
+  }
 
   async function inspect(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -179,7 +216,7 @@ export default function Intelligence() {
       {tab === "ci" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
         <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.ci.completedRuns} completed of {repo.ci.recentRuns} recent runs · {repo.ci.totalReported === null ? "total unavailable" : repo.ci.totalReported + " total runs reported"}</p></div><strong>{repo.ci.successRate === null ? "N/A" : repo.ci.successRate + "%"}<small>success rate</small></strong></div>
         {!repo.ci.available && <p className="intel-note">Actions data was unavailable. No conclusion about CI health can be made.</p>}
-        {repo.ci.failures.length === 0 ? <p className="intel-note">No failed runs in the returned sample. This is not proof that every workflow is passing.</p> : <div className="intel-failure-list">{repo.ci.failures.filter((run) => matchesSearch([repo.repository.fullName, run.name, run.branch, run.number, run.conclusion, run.status], findingSearch) && matchesSeverity(run.conclusion === "failure" ? "high" : run.conclusion || "info", severityFilter)).map((run) => { const detail = repo.ci.failedJobDetails.find((item) => item.runId === run.id); return <div className="intel-failure" key={run.id}><span className="intel-run-status">×</span><div><a href={run.url} target="_blank" rel="noreferrer">{run.name} · #{run.number}</a><small>{run.branch} · {ago(run.createdAt)} · {run.conclusion}</small>{detail?.failedJobs.length ? detail.failedJobs.map((job) => <p key={job.name}><b>{job.name}</b>{job.steps.length ? " — failed step: " + job.steps.join(", ") : " — failed job; step detail unavailable"}</p>) : <p>Failed run observed; job-level root cause was not available from the sampled API data.</p>}</div><button onClick={() => { setPlan({ title: "CI remediation plan · " + run.name, steps: safePlan("CI failure", "Reproduce this exact run on its branch, inspect the failed job and logs, identify the first causal error, then add a regression test before applying a focused fix.", run.url) }); }}>Build fix plan</button></div>; })}</div>}
+        {repo.ci.failures.length === 0 ? <p className="intel-note">No failed runs in the returned sample. This is not proof that every workflow is passing.</p> : <div className="intel-failure-list">{repo.ci.failures.filter((run) => matchesSearch([repo.repository.fullName, run.name, run.branch, run.number, run.conclusion, run.status], findingSearch) && matchesSeverity(run.conclusion === "failure" ? "high" : run.conclusion || "info", severityFilter)).map((run) => { const detail = repo.ci.failedJobDetails.find((item) => item.runId === run.id); return <div className="intel-failure" key={run.id}><span className="intel-run-status">×</span><div><a href={run.url} target="_blank" rel="noreferrer">{run.name} · #{run.number}</a><small>{run.branch} · {ago(run.createdAt)} · {run.conclusion} · Priority {scoreRemediationPriority({ severity: run.conclusion === "failure" ? "high" : run.conclusion || "info", category: "ci", evidenceAvailable: isHttpUrl(run.url) }).score}/100 ({scoreRemediationPriority({ severity: run.conclusion === "failure" ? "high" : run.conclusion || "info", category: "ci", evidenceAvailable: isHttpUrl(run.url) }).label})</small>{detail?.failedJobs.length ? detail.failedJobs.map((job) => <p key={job.name}><b>{job.name}</b>{job.steps.length ? " — failed step: " + job.steps.join(", ") : " — failed job; step detail unavailable"}</p>) : <p>Failed run observed; job-level root cause was not available from the sampled API data.</p>}</div><button onClick={() => { buildPlan("CI remediation plan · " + run.name, "Reproduce this exact run on its branch, inspect the failed job and logs, identify the first causal error, then add a regression test before applying a focused fix.", run.url, run.conclusion === "failure" ? "high" : "info", "ci", run.url, "Open workflow run"); }}>Build fix plan</button></div>; })}</div>}
       </section>)}</div>}
 
       {tab === "reviews" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
@@ -188,7 +225,7 @@ export default function Intelligence() {
         {repo.pullRequests.reviews.map((pr) => <div className="intel-pr-review" key={pr.number}>
           <div className="intel-pr-heading"><div><a href={pr.url} target="_blank" rel="noreferrer">#{pr.number} {pr.title}</a><small>{pr.author} · {pr.branch} → {pr.baseBranch} · updated {ago(pr.updatedAt)}{pr.draft ? " · draft" : ""}</small></div><span>{pr.changedFiles} files</span></div>
           <p className="intel-note">Change size: +{pr.additions} / −{pr.deletions} lines. {pr.reviewMode === "ai-assisted" ? "AI-assisted diff review." : "Deterministic heuristic review; configure AGENTIQ_AI_API_KEY for optional model-assisted analysis."} {pr.hasPatchEvidence ? "Patch metadata available." : "Patch text unavailable; findings use changed-file metadata only."}</p>
-          <div className="intel-finding-list">{pr.findings.filter((finding) => matchesSearch([repo.repository.fullName, pr.title, pr.number, pr.author, finding.title, finding.detail, finding.recommendation, finding.evidence], findingSearch) && matchesSeverity(finding.severity, severityFilter)).map((finding, index) => <div className="intel-finding" key={finding.title + index}><span className={severityClass(finding.severity)}>{finding.severity}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p><small>Evidence: {finding.evidence}</small><p className="intel-recommendation">{finding.recommendation}</p></div><button onClick={() => setPlan({ title: "Safe remediation plan · PR #" + pr.number + " · " + finding.title, steps: safePlan(finding.title, finding.recommendation, finding.evidence) })}>Plan</button></div>)}</div>
+          <div className="intel-finding-list">{pr.findings.filter((finding) => matchesSearch([repo.repository.fullName, pr.title, pr.number, pr.author, finding.title, finding.detail, finding.recommendation, finding.evidence], findingSearch) && matchesSeverity(finding.severity, severityFilter)).map((finding, index) => <div className="intel-finding" key={finding.title + index}><span className={severityClass(finding.severity)}>{finding.severity}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p><small>Priority: {scoreRemediationPriority({ severity: finding.severity, category: "review", evidenceAvailable: isHttpUrl(finding.evidence) || isHttpUrl(pr.url) }).score}/100 ({scoreRemediationPriority({ severity: finding.severity, category: "review", evidenceAvailable: isHttpUrl(finding.evidence) || isHttpUrl(pr.url) }).label})</small><small>Evidence: {isHttpUrl(finding.evidence) ? <a href={finding.evidence} target="_blank" rel="noreferrer">Open cited source</a> : <a href={pr.url} target="_blank" rel="noreferrer">Open source pull request</a>} · {finding.evidence}</small><p className="intel-recommendation"><strong>Proposed fix:</strong> {finding.recommendation}</p></div><button onClick={() => buildPlan("Safe remediation plan · PR #" + pr.number + " · " + finding.title, finding.recommendation, finding.evidence, finding.severity, "review", isHttpUrl(finding.evidence) ? finding.evidence : pr.url, isHttpUrl(finding.evidence) ? "Open cited evidence" : "Open source pull request")}>Plan</button></div>)}</div>
         </div>)}
         {repo.pullRequests.available && repo.pullRequests.reviews.length === 0 && <p className="intel-note">No open pull requests were returned. Closed and merged PRs are not included in this sample.</p>}
       </section>)}</div>}
@@ -196,12 +233,12 @@ export default function Intelligence() {
       {tab === "security" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
         <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.repository.license} · {repo.repository.openIssues} open issues · {repo.maintenance.staleOpenIssues} issues not updated in 90 days</p></div><strong>{repo.security.available ? repo.security.openCount : "N/A"}<small>alerts returned</small></strong></div>
         <p className="intel-note">{repo.security.note}</p>
-        {repo.security.alerts.filter((alert) => matchesSearch([repo.repository.fullName, alert.packageName, alert.summary, alert.manifestPath, alert.state, alert.patchedVersion], findingSearch) && matchesSeverity(alert.severity, severityFilter)).map((alert) => <div className="intel-alert" key={alert.number}><span className={severityClass(alert.severity)}>{alert.severity}</span><div><a href={alert.url} target="_blank" rel="noreferrer">{alert.packageName}: {alert.summary}</a><small>{alert.manifestPath || "Manifest path unavailable"}{alert.patchedVersion ? " · patched in " + alert.patchedVersion : ""}</small></div><button onClick={() => setPlan({ title: "Dependency remediation plan · " + alert.packageName, steps: safePlan("Dependency alert", "Verify the advisory and affected version range, update to the first patched compatible version, regenerate the lockfile, and run audit, build, and tests.", alert.url) })}>Plan fix</button></div>)}
+        {repo.security.alerts.filter((alert) => matchesSearch([repo.repository.fullName, alert.packageName, alert.summary, alert.manifestPath, alert.state, alert.patchedVersion], findingSearch) && matchesSeverity(alert.severity, severityFilter)).map((alert) => <div className="intel-alert" key={alert.number}><span className={severityClass(alert.severity)}>{alert.severity}</span><div><a href={alert.url} target="_blank" rel="noreferrer">{alert.packageName}: {alert.summary}</a><small>Priority: {scoreRemediationPriority({ severity: alert.severity, category: "security", evidenceAvailable: isHttpUrl(alert.url) }).score}/100 ({scoreRemediationPriority({ severity: alert.severity, category: "security", evidenceAvailable: isHttpUrl(alert.url) }).label})</small><small>{alert.manifestPath || "Manifest path unavailable"}{alert.patchedVersion ? " · patched in " + alert.patchedVersion : ""}</small></div><button onClick={() => buildPlan("Dependency remediation plan · " + alert.packageName, "Verify the advisory and affected version range, update to the first patched compatible version, regenerate the lockfile, and run audit, build, and tests.", alert.url, alert.severity, "security", alert.url, "Open dependency advisory")}>Plan fix</button></div>)}
         {repo.security.available && repo.security.alerts.length === 0 && <p className="intel-note">GitHub returned no open Dependabot alerts for this request. Other scanners or private advisories may not be represented.</p>}
       </section>)}</div>}
     </>}
 
-    {plan && <section className="panel intel-plan-panel"><div className="intel-section-head"><div><span className="intel-kicker">REVIEWABLE REMEDIATION PLAN</span><h3>{plan.title}</h3><p>Actionable plan based on available evidence; no repository files have been changed.</p></div><div className="intel-plan-actions"><button className="secondary-button" onClick={() => downloadPlan(plan)}>Export Markdown</button><button className="secondary-button" onClick={() => setPlan(null)}>Close</button></div></div><ol>{plan.steps.map((step, index) => <li key={index}>{step}</li>)}</ol><p className="intel-note">Safety boundary: this version generates a reviewable plan only. It does not execute untrusted code, push commits, create PRs, or merge changes automatically.</p></section>}
+    {plan && <section className="panel intel-plan-panel"><div className="intel-section-head"><div><span className="intel-kicker">EVIDENCE-BACKED REMEDIATION</span><h3>{plan.title}</h3><p>Priority <strong>{plan.priority.score}/100 · {plan.priority.label}</strong> — {plan.priority.reasons.join(" · ")}</p></div><div className="intel-plan-actions"><button className="secondary-button" onClick={() => downloadPlan(plan)}>Export Markdown</button><button className="secondary-button" onClick={() => setPlan(null)}>Close</button></div></div><div className="intel-proposal"><strong>Proposed fix</strong><p>{plan.proposal}</p>{plan.evidenceUrl ? <a href={plan.evidenceUrl} target="_blank" rel="noreferrer">{plan.evidenceLabel} ↗</a> : <p className="intel-note">No verified source URL was available. Locate the source manually before approving.</p>}</div><ol>{plan.steps.map((step, index) => <li key={index}>{step}</li>)}</ol><div className="intel-approval"><div><h4>Safety gate · human review required</h4><p>Approval only records your review in this page. It does not execute code, push commits, open a PR, or merge changes.</p></div>{planCheckLabels.map((item) => <label key={item.key}><input type="checkbox" checked={plan.checks[item.key]} onChange={(event) => setPlan((current) => current ? { ...current, checks: { ...current.checks, [item.key]: event.target.checked }, approved: false } : current)} />{item.label}</label>)}<button className="primary-button" disabled={!planCheckLabels.every((item) => plan.checks[item.key]) || !plan.evidenceUrl} onClick={() => setPlan((current) => current ? { ...current, approved: true } : current)}>Approve plan for manual implementation</button><p className={plan.approved ? "intel-approved-status" : "intel-note"} role="status">{plan.approved ? "Human review recorded for this session. No repository changes have been made." : "Complete all four checks and verify the evidence link to enable approval."}</p></div><p className="intel-note">Safety boundary: AgentIQ creates an advisory plan only. Implementation and any PR/merge action remain separate, explicitly reviewed steps.</p></section>}
 
     {results.length === 0 && !loading && <section className="intel-empty-state"><div className="intel-empty-icon">✦</div><h3>Ready to inspect repository health</h3><p>Get a comparable view of CI reliability, maintenance signals, open security alerts, and PR review prompts. Try adding facebook/react or vercel/next.js to compare repositories.</p><button className="secondary-button" onClick={() => setInput("kamran-nizamani/AgentIQ\nfacebook/react\nvercel/next.js")}>Load comparison examples</button></section>}
     <p className="intel-disclaimer">Evidence-driven, not omniscient. Health scores are heuristic summaries of accessible GitHub signals, not a security certification. Static PR prompts are not confirmed defects. Missing permissions, disabled Actions, rate limits, and absent reports remain unknown.</p>
