@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { formatRemediationPlanMarkdown } from "./remediation-plan.js";
 
 type Finding = { severity: "high" | "medium" | "info"; title: string; detail: string; recommendation: string; evidence: string };
 type HealthComponent = { key: string; label: string; score: number | null; weight: number; detail: string };
@@ -33,6 +34,20 @@ function downloadJson(data: unknown) {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+function downloadPlan(plan: { title: string; steps: string[] }) {
+  const blob = new Blob([formatRemediationPlanMarkdown(plan)], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  const slug = plan.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "remediation-plan";
+  anchor.download = "agentiq-" + slug + ".md";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function safePlan(title: string, recommendation: string, evidence: string): string[] {
   return [
     "Inspect the linked source and confirm the finding applies to this repository.",
@@ -138,7 +153,7 @@ export default function Intelligence() {
       </section>)}</div>}
     </>}
 
-    {plan && <section className="panel intel-plan-panel"><div className="intel-section-head"><div><span className="intel-kicker">HUMAN-APPROVED REMEDIATION</span><h3>{plan.title}</h3><p>Actionable plan based on available evidence; no repository files have been changed.</p></div><button className="secondary-button" onClick={() => setPlan(null)}>Close</button></div><ol>{plan.steps.map((step, index) => <li key={index}>{step}</li>)}</ol><p className="intel-note">Safety boundary: this version generates a reviewable plan only. It does not execute untrusted code, push commits, create PRs, or merge changes automatically.</p></section>}
+    {plan && <section className="panel intel-plan-panel"><div className="intel-section-head"><div><span className="intel-kicker">REVIEWABLE REMEDIATION PLAN</span><h3>{plan.title}</h3><p>Actionable plan based on available evidence; no repository files have been changed.</p></div><div className="intel-plan-actions"><button className="secondary-button" onClick={() => downloadPlan(plan)}>Export Markdown</button><button className="secondary-button" onClick={() => setPlan(null)}>Close</button></div></div><ol>{plan.steps.map((step, index) => <li key={index}>{step}</li>)}</ol><p className="intel-note">Safety boundary: this version generates a reviewable plan only. It does not execute untrusted code, push commits, create PRs, or merge changes automatically.</p></section>}
 
     {results.length === 0 && !loading && <section className="intel-empty-state"><div className="intel-empty-icon">✦</div><h3>Ready to inspect repository health</h3><p>Get a comparable view of CI reliability, maintenance signals, open security alerts, and PR review prompts. Try adding facebook/react or vercel/next.js to compare repositories.</p><button className="secondary-button" onClick={() => setInput("kamran-nizamani/AgentIQ\nfacebook/react\nvercel/next.js")}>Load comparison examples</button></section>}
     <p className="intel-disclaimer">Evidence-driven, not omniscient. Health scores are heuristic summaries of accessible GitHub signals, not a security certification. Static PR prompts are not confirmed defects. Missing permissions, disabled Actions, rate limits, and absent reports remain unknown.</p>
