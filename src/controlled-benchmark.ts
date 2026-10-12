@@ -81,10 +81,14 @@ function optionalMetric(values: Array<number | null | undefined>, field: string,
 }
 
 function controlsFor(run: ControlledBenchmarkRun): BenchmarkControls {
+  const baseCommitSha = requireText(run.baseCommitSha, "baseCommitSha").toLowerCase();
+  if (!/^[a-f0-9]{7,40}$/.test(baseCommitSha)) {
+    throw new Error("baseCommitSha must be a valid 7-40 character hexadecimal commit SHA.");
+  }
   return {
     taskId: requireText(run.taskId, "taskId"),
     repository: requireText(run.repository, "repository").toLowerCase(),
-    baseCommitSha: requireText(run.baseCommitSha, "baseCommitSha").toLowerCase(),
+    baseCommitSha,
     testSuiteVersion: requireText(run.testSuiteVersion, "testSuiteVersion"),
     environmentFingerprint: requireText(run.environmentFingerprint, "environmentFingerprint"),
     policyVersion: requireText(run.policyVersion, "policyVersion"),
