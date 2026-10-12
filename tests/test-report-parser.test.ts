@@ -65,6 +65,13 @@ describe("parseTestReport", () => {
       .toThrow("requires valid total and passed counts");
   });
 
+  it("counts pending and todo tests without dropping either category", () => {
+    expect(parseTestReport(JSON.stringify({
+      numTotalTests: 5, numPassedTests: 2, numFailedTests: 0,
+      numPendingTests: 1, numTodoTests: 2,
+    }), "vitest-json")).toMatchObject({ total: 5, passed: 2, failed: 0, skipped: 3, warnings: [] });
+  });
+
   it("enforces a 5 MiB input limit", () => {
     expect(() => parseTestReport("x".repeat(5 * 1024 * 1024 + 1), "junit-xml"))
       .toThrow("5 MiB size limit");
