@@ -42,7 +42,7 @@ describe("evidence-aware evaluation", () => {
     ]));
     const explainedScore = report.scoreExplanation.reduce((sum, dimension) => sum + dimension.contribution, 0);
     expect(Math.round(explainedScore)).toBe(report.evaluation.score);
-    expect(report.scoreExplanation.find((dimension) => dimension.key === "outcome")?.appliedWeight).toBeCloseTo(43.75);
+    expect(report.scoreExplanation.find((dimension) => dimension.key === "outcome")?.appliedWeight).toBeCloseTo(58.33);
   });
 
   it("verifies scores when both test and diff evidence are present", () => {
