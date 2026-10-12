@@ -82,6 +82,19 @@ function safePlan(title: string, recommendation: string, evidence: string): stri
   ];
 }
 
+function matchesSearch(values: Array<string | number | null | undefined>, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  return !normalized || values.some((value) => String(value ?? "").toLowerCase().includes(normalized));
+}
+
+function matchesSeverity(value: string, filter: "all" | "high" | "medium" | "info"): boolean {
+  if (filter === "all") return true;
+  const severity = value.toLowerCase();
+  if (filter === "high") return severity === "critical" || severity === "high" || severity === "failure";
+  if (filter === "medium") return severity === "medium" || severity === "moderate";
+  return severity === "low" || severity === "info" || severity === "success" || severity === "neutral";
+}
+
 export default function Intelligence() {
   const [input, setInput] = useState("kamran-nizamani/AgentIQ");
   const [results, setResults] = useState<Result[]>([]);
@@ -89,6 +102,8 @@ export default function Intelligence() {
   const [error, setError] = useState("");
   const [plan, setPlan] = useState<{ title: string; steps: string[] } | null>(null);
   const [tab, setTab] = useState<"overview" | "ci" | "reviews" | "security">("overview");
+  const [findingSearch, setFindingSearch] = useState("");
+  const [severityFilter, setSeverityFilter] = useState<"all" | "high" | "medium" | "info">("all");
   const successful = useMemo(() => results.filter((result): result is Extract<Result, { ok: true }> => result.ok).map((result) => result.data), [results]);
   const totalFailures = successful.reduce((sum, repo) => sum + repo.ci.failures.length, 0);
   const securityAvailableRepos = successful.filter((repo) => repo.security.available).length;
@@ -143,7 +158,14 @@ export default function Intelligence() {
         <button className="intel-export" onClick={() => downloadCsv(results)}>Export CSV findings</button>
       </section>
 
-      {tab === "overview" && <div className="intel-repo-grid">{successful.map((repo) => <article className="panel intel-repo-card" key={repo.repository.fullName}>
+      <div className="intel-filter-bar" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, margin: "12px 0 18px" }}>
+        <label htmlFor="intel-finding-search" style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>Search repositories and findings</label>
+        <input id="intel-finding-search" type="search" value={findingSearch} onChange={(event) => setFindingSearch(event.target.value)} placeholder="Search repositories, findings, packages, branches…" style={{ flex: "1 1 280px", minWidth: 0, padding: "11px 13px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--panel)", color: "inherit" }} />
+        <label htmlFor="intel-severity-filter" style={{ display: "flex", alignItems: "center", gap: 8 }}>Severity <select id="intel-severity-filter" value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value as "all" | "high" | "medium" | "info")} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--panel)", color: "inherit" }}><option value="all">All severities</option><option value="high">High / critical</option><option value="medium">Medium</option><option value="info">Low / info</option></select></label>
+        {(findingSearch || severityFilter !== "all") && <button className="secondary-button" onClick={() => { setFindingSearch(""); setSeverityFilter("all"); }}>Clear filters</button>}
+      </div>
+
+      {tab === "overview" && <div className="intel-repo-grid">{successful.filter((repo) => matchesSearch([repo.repository.fullName, repo.repository.description, repo.repository.language, repo.repository.license], findingSearch)).map((repo) => <article className="panel intel-repo-card" key={repo.repository.fullName}>
         <div className="intel-repo-head"><div><a href={repo.repository.url} target="_blank" rel="noreferrer">{repo.repository.fullName}</a><p>{repo.repository.description || "No description provided."}</p></div><div className="intel-grade"><strong>{repo.health.score === null ? "—" : repo.health.score}</strong><span>{repo.health.grade} · /100</span></div></div>
         <div className="intel-health-track"><i style={{ width: (repo.health.score ?? 0) + "%" }} /></div>
         <div className="intel-repo-stats"><span>★ {repo.repository.stars.toLocaleString()}</span><span>{repo.repository.language || "Language unknown"}</span><span>{repo.repository.license}</span><span>{repo.repository.archived ? "Archived" : repo.maintenance.lastPushAgeDays === null ? "Push date unknown" : "Pushed " + repo.maintenance.lastPushAgeDays + "d ago"}</span></div>
@@ -157,7 +179,7 @@ export default function Intelligence() {
       {tab === "ci" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
         <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.ci.completedRuns} completed of {repo.ci.recentRuns} recent runs · {repo.ci.totalReported === null ? "total unavailable" : repo.ci.totalReported + " total runs reported"}</p></div><strong>{repo.ci.successRate === null ? "N/A" : repo.ci.successRate + "%"}<small>success rate</small></strong></div>
         {!repo.ci.available && <p className="intel-note">Actions data was unavailable. No conclusion about CI health can be made.</p>}
-        {repo.ci.failures.length === 0 ? <p className="intel-note">No failed runs in the returned sample. This is not proof that every workflow is passing.</p> : <div className="intel-failure-list">{repo.ci.failures.map((run) => { const detail = repo.ci.failedJobDetails.find((item) => item.runId === run.id); return <div className="intel-failure" key={run.id}><span className="intel-run-status">×</span><div><a href={run.url} target="_blank" rel="noreferrer">{run.name} · #{run.number}</a><small>{run.branch} · {ago(run.createdAt)} · {run.conclusion}</small>{detail?.failedJobs.length ? detail.failedJobs.map((job) => <p key={job.name}><b>{job.name}</b>{job.steps.length ? " — failed step: " + job.steps.join(", ") : " — failed job; step detail unavailable"}</p>) : <p>Failed run observed; job-level root cause was not available from the sampled API data.</p>}</div><button onClick={() => { setPlan({ title: "CI remediation plan · " + run.name, steps: safePlan("CI failure", "Reproduce this exact run on its branch, inspect the failed job and logs, identify the first causal error, then add a regression test before applying a focused fix.", run.url) }); }}>Build fix plan</button></div>; })}</div>}
+        {repo.ci.failures.length === 0 ? <p className="intel-note">No failed runs in the returned sample. This is not proof that every workflow is passing.</p> : <div className="intel-failure-list">{repo.ci.failures.filter((run) => matchesSearch([repo.repository.fullName, run.name, run.branch, run.number, run.conclusion, run.status], findingSearch) && matchesSeverity(run.conclusion === "failure" ? "high" : run.conclusion || "info", severityFilter)).map((run) => { const detail = repo.ci.failedJobDetails.find((item) => item.runId === run.id); return <div className="intel-failure" key={run.id}><span className="intel-run-status">×</span><div><a href={run.url} target="_blank" rel="noreferrer">{run.name} · #{run.number}</a><small>{run.branch} · {ago(run.createdAt)} · {run.conclusion}</small>{detail?.failedJobs.length ? detail.failedJobs.map((job) => <p key={job.name}><b>{job.name}</b>{job.steps.length ? " — failed step: " + job.steps.join(", ") : " — failed job; step detail unavailable"}</p>) : <p>Failed run observed; job-level root cause was not available from the sampled API data.</p>}</div><button onClick={() => { setPlan({ title: "CI remediation plan · " + run.name, steps: safePlan("CI failure", "Reproduce this exact run on its branch, inspect the failed job and logs, identify the first causal error, then add a regression test before applying a focused fix.", run.url) }); }}>Build fix plan</button></div>; })}</div>}
       </section>)}</div>}
 
       {tab === "reviews" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
@@ -166,7 +188,7 @@ export default function Intelligence() {
         {repo.pullRequests.reviews.map((pr) => <div className="intel-pr-review" key={pr.number}>
           <div className="intel-pr-heading"><div><a href={pr.url} target="_blank" rel="noreferrer">#{pr.number} {pr.title}</a><small>{pr.author} · {pr.branch} → {pr.baseBranch} · updated {ago(pr.updatedAt)}{pr.draft ? " · draft" : ""}</small></div><span>{pr.changedFiles} files</span></div>
           <p className="intel-note">Change size: +{pr.additions} / −{pr.deletions} lines. {pr.reviewMode === "ai-assisted" ? "AI-assisted diff review." : "Deterministic heuristic review; configure AGENTIQ_AI_API_KEY for optional model-assisted analysis."} {pr.hasPatchEvidence ? "Patch metadata available." : "Patch text unavailable; findings use changed-file metadata only."}</p>
-          <div className="intel-finding-list">{pr.findings.map((finding, index) => <div className="intel-finding" key={finding.title + index}><span className={severityClass(finding.severity)}>{finding.severity}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p><small>Evidence: {finding.evidence}</small><p className="intel-recommendation">{finding.recommendation}</p></div><button onClick={() => setPlan({ title: "Safe remediation plan · PR #" + pr.number + " · " + finding.title, steps: safePlan(finding.title, finding.recommendation, finding.evidence) })}>Plan</button></div>)}</div>
+          <div className="intel-finding-list">{pr.findings.filter((finding) => matchesSearch([repo.repository.fullName, pr.title, pr.number, pr.author, finding.title, finding.detail, finding.recommendation, finding.evidence], findingSearch) && matchesSeverity(finding.severity, severityFilter)).map((finding, index) => <div className="intel-finding" key={finding.title + index}><span className={severityClass(finding.severity)}>{finding.severity}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p><small>Evidence: {finding.evidence}</small><p className="intel-recommendation">{finding.recommendation}</p></div><button onClick={() => setPlan({ title: "Safe remediation plan · PR #" + pr.number + " · " + finding.title, steps: safePlan(finding.title, finding.recommendation, finding.evidence) })}>Plan</button></div>)}</div>
         </div>)}
         {repo.pullRequests.available && repo.pullRequests.reviews.length === 0 && <p className="intel-note">No open pull requests were returned. Closed and merged PRs are not included in this sample.</p>}
       </section>)}</div>}
@@ -174,7 +196,7 @@ export default function Intelligence() {
       {tab === "security" && <div className="intel-section-list">{successful.map((repo) => <section className="panel intel-detail-card" key={repo.repository.fullName}>
         <div className="intel-section-head"><div><h3>{repo.repository.fullName}</h3><p>{repo.repository.license} · {repo.repository.openIssues} open issues · {repo.maintenance.staleOpenIssues} issues not updated in 90 days</p></div><strong>{repo.security.available ? repo.security.openCount : "N/A"}<small>alerts returned</small></strong></div>
         <p className="intel-note">{repo.security.note}</p>
-        {repo.security.alerts.map((alert) => <div className="intel-alert" key={alert.number}><span className={severityClass(alert.severity)}>{alert.severity}</span><div><a href={alert.url} target="_blank" rel="noreferrer">{alert.packageName}: {alert.summary}</a><small>{alert.manifestPath || "Manifest path unavailable"}{alert.patchedVersion ? " · patched in " + alert.patchedVersion : ""}</small></div><button onClick={() => setPlan({ title: "Dependency remediation plan · " + alert.packageName, steps: safePlan("Dependency alert", "Verify the advisory and affected version range, update to the first patched compatible version, regenerate the lockfile, and run audit, build, and tests.", alert.url) })}>Plan fix</button></div>)}
+        {repo.security.alerts.filter((alert) => matchesSearch([repo.repository.fullName, alert.packageName, alert.summary, alert.manifestPath, alert.state, alert.patchedVersion], findingSearch) && matchesSeverity(alert.severity, severityFilter)).map((alert) => <div className="intel-alert" key={alert.number}><span className={severityClass(alert.severity)}>{alert.severity}</span><div><a href={alert.url} target="_blank" rel="noreferrer">{alert.packageName}: {alert.summary}</a><small>{alert.manifestPath || "Manifest path unavailable"}{alert.patchedVersion ? " · patched in " + alert.patchedVersion : ""}</small></div><button onClick={() => setPlan({ title: "Dependency remediation plan · " + alert.packageName, steps: safePlan("Dependency alert", "Verify the advisory and affected version range, update to the first patched compatible version, regenerate the lockfile, and run audit, build, and tests.", alert.url) })}>Plan fix</button></div>)}
         {repo.security.available && repo.security.alerts.length === 0 && <p className="intel-note">GitHub returned no open Dependabot alerts for this request. Other scanners or private advisories may not be represented.</p>}
       </section>)}</div>}
     </>}
