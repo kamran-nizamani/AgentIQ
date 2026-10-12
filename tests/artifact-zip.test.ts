@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readZipTextMember } from "../src/artifact-zip.js";
+import { readZipTextMember, readZipTextMembers } from "../src/artifact-zip.js";
 
 function zipSingle(name: string, value: string): Uint8Array {
   const filename = Buffer.from(name, "utf8");
@@ -53,5 +53,21 @@ describe("readZipTextMember", () => {
 
   it("rejects oversized evidence members", () => {
     expect(() => readZipTextMember(zipSingle("agentiq-evidence.json", "12345"), "agentiq-evidence.json", 4)).toThrow(/exceeds the allowed size/);
+  });
+});
+
+
+describe("readZipTextMembers", () => {
+  it("reads text logs from a bounded GitHub Actions log archive", () => {
+    const archive = zipSingle("0_Test_job.txt", "Tests 12 passed (12)");
+    expect(readZipTextMembers(archive)).toEqual([{ name: "0_Test_job.txt", text: "Tests 12 passed (12)" }]);
+  });
+
+  it("enforces the archive size limit before parsing", () => {
+    expect(() => readZipTextMembers(zipSingle("0_Test_job.txt", "log"), 4)).toThrow(/archive exceeds the allowed size/);
+  });
+
+  it("returns no extracted log files when the archive contains only non-text members", () => {
+    expect(readZipTextMembers(zipSingle("metadata.json", "{}"))).toEqual([]);
   });
 });

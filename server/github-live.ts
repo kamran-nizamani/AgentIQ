@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readZipTextMember } from "../src/artifact-zip.js";
+import { readZipTextMember, readZipTextMembers } from "../src/artifact-zip.js";
 import { validateEvidenceArtifact } from "../src/artifact-validation.js";
 import { durableStorageConfigured, getStoredRunDetail, listStoredRunSummaries, saveRunDetail, saveRunSummaries } from "./durable-store.js";
 import { createEvidenceBundle, ingestGitDiffEvidence, ingestTestEvidence } from "../src/ingestion.js";
@@ -126,8 +126,16 @@ async function githubGetText(path: string): Promise<string> {
   if (token) headers.Authorization = "Bearer " + token;
   const response = await fetch("https://api.github.com" + path, { headers, cache: "no-store", redirect: "follow" });
   if (!response.ok) throw new GitHubLiveError("GitHub job logs are unavailable (HTTP " + response.status + ").", 502);
-  // Test summaries are conventionally near the end; cap retained text to keep function memory bounded.
-  return (await response.text()).slice(-2_000_000);
+  const declaredLength = Number(response.headers.get("content-length") || 0);
+  if (declaredLength > 10_000_000) throw new GitHubLiveError("GitHub job log archive exceeds the 10 MB limit.", 502);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length > 10_000_000) throw new GitHubLiveError("GitHub job log archive exceeds the 10 MB limit.", 502);
+  // The Actions API redirects to a ZIP archive. Decode its text members instead of
+  // feeding compressed binary bytes to the test-summary parser.
+  if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    return readZipTextMembers(bytes).map((member) => "\n--- " + member.name + " ---\n" + member.text).join("\n").slice(-2_000_000);
+  }
+  return new TextDecoder().decode(bytes).slice(-2_000_000);
 }
 
 async function collectTestEvidence(repository: string, jobs: GitHubJobApi[], evidence: EvidenceBundle): Promise<void> {
