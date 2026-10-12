@@ -83,6 +83,11 @@ describe("controlled benchmark cohorts", () => {
       .toThrow("testPassRate values must be finite");
   });
 
+  it("rejects duplicate run IDs so repeated records cannot inflate sample sizes", () => {
+    const first = run("agent-a", 80);
+    expect(() => compareControlledBenchmarks([first, { ...first }])).toThrow("Duplicate runId");
+  });
+
   it("returns an empty list for an empty benchmark", () => {
     expect(compareControlledBenchmarks([])).toEqual([]);
   });
