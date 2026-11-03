@@ -139,7 +139,7 @@ async function githubGetText(path: string): Promise<string> {
   return new TextDecoder().decode(bytes).slice(-2_000_000);
 }
 
-async function collectTestEvidence(repository: string, jobs: GitHubJobApi[], evidence: EvidenceBundle): Promise<void> {
+async function collectTestEvidence(repository: string, raw: GitHubRunApi, jobs: GitHubJobApi[], evidence: EvidenceBundle): Promise<void> {
   const candidates = jobs.filter((job) => job.status === "completed" && /test|ci/i.test(job.name)).slice(0, 8);
   const summaries = await Promise.all(candidates.map(async (job) => {
     try {
@@ -153,7 +153,7 @@ async function collectTestEvidence(repository: string, jobs: GitHubJobApi[], evi
         failed: summary.failed,
         skipped: summary.skipped,
         durationMs: summary.durationMs,
-        sourceId: "github-job-log:" + job.id,
+        sourceId: "github-actions:" + repository + ":" + raw.id + ":" + job.id,\n        repository,\n        workflowRunId: raw.id,\n        commitSha: raw.head_sha,\n        jobId: job.id,
       });
     } catch {
       // A missing or inaccessible log is not test evidence.
@@ -418,7 +418,7 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
   const artifactEvidence = await collectArtifactTestEvidence(repository, raw, normalized.evidence);
   normalized.artifactEvidence = artifactEvidence;
-  if (artifactEvidence.status !== "verified") await collectTestEvidence(repository, jobsPayload.jobs, normalized.evidence);
+  if (artifactEvidence.status !== "verified") await collectTestEvidence(repository, raw, jobsPayload.jobs, normalized.evidence);
   await collectCommitEvidence(repository, raw, normalized.evidence);
   const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);
   refreshedRun.id = String(raw.id);
