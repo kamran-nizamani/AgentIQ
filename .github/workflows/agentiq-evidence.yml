@@ -10,37 +10,44 @@ permissions:
   pull-requests: read
 jobs:
   collect:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Download the test report from the original CI run
+        uses: actions/download-artifact@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm install --no-audit --no-fund
-      - run: npm run typecheck
-      - name: Run tests and write a machine-readable report
-        run: npm test -- --reporter=json --outputFile=test-results.json
-      - name: Emit provenance-bound evidence
+          name: agentiq-test-results
+          path: upstream-artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+      - name: Emit evidence from the original run only
         env:
           AGENTIQ_RUN_ID: ${{ github.event.workflow_run.id }}
           AGENTIQ_ARTIFACT_RUN_ID: ${{ github.run_id }}
           AGENTIQ_REPOSITORY: ${{ github.repository }}
           AGENTIQ_SHA: ${{ github.event.workflow_run.head_sha }}
           AGENTIQ_WORKFLOW: ${{ github.event.workflow_run.name }}
+          AGENTIQ_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           node --input-type=module <<'NODE'
           import fs from "node:fs";
 
-          const report = JSON.parse(fs.readFileSync("test-results.json", "utf8"));
+          const reportPath = "upstream-artifacts/test-results.json";
+          if (!fs.existsSync(reportPath)) {
+            console.warn("Original CI run did not upload agentiq-test-results; no test evidence will be generated.");
+            process.exit(0);
+          }
+
+          const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+          const total = Number(report.numTotalTests);
           const passed = Number(report.numPassedTests ?? 0);
           const failed = Number(report.numFailedTests ?? 0);
           const skipped = Number(report.numPendingTests ?? 0) + Number(report.numTodoTests ?? 0);
-          const total = passed + failed + skipped;
-          if (!Number.isInteger(total) || total <= 0 || passed + failed + skipped !== total) {
-            throw new Error("Vitest produced an incomplete or invalid test summary.");
+          if (![total, passed, failed, skipped].every(Number.isSafeInteger) ||
+              [total, passed, failed, skipped].some((count) => count < 0) ||
+              total <= 0 || passed + failed + skipped !== total) {
+            throw new Error("Original CI test report has missing, invalid, or inconsistent counts.");
           }
 
           const now = new Date().toISOString();
@@ -66,7 +73,7 @@ jobs:
                   artifactRunId: process.env.AGENTIQ_ARTIFACT_RUN_ID,
                   commitSha,
                   workflowName: process.env.AGENTIQ_WORKFLOW,
-                  conclusion: "success"
+                  conclusion: process.env.AGENTIQ_CONCLUSION
                 }
               },
               {
@@ -93,13 +100,17 @@ jobs:
             ]
           };
 
+          fs.copyFileSync(reportPath, "test-results.json");
           fs.writeFileSync("agentiq-evidence.json", JSON.stringify(evidence, null, 2) + "\n");
-          console.log(JSON.stringify({ repository, workflowRunId, commitSha, tests: { total, passed, failed, skipped } }));
+          console.log(JSON.stringify({ repository, workflowRunId, commitSha, conclusion: process.env.AGENTIQ_CONCLUSION, tests: { total, passed, failed, skipped } }));
           NODE
-      - uses: actions/upload-artifact@v4
+      - name: Upload verified-source evidence artifact
+        if: hashFiles('agentiq-evidence.json') != ''
+        uses: actions/upload-artifact@v4
         with:
           name: agentiq-evidence
           path: |
             agentiq-evidence.json
             test-results.json
           if-no-files-found: error
+          retention-days: 14
