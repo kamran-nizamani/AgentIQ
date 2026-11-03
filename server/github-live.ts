@@ -58,6 +58,7 @@ export type LiveRunRecord = {
   evidenceCount: number;
   riskCount: number;
   agent: string;
+  agentAttribution?: import("../src/artifact-validation.js").AgentAttribution;
   task: string;
   durationMs: number;
   url: string;
@@ -78,7 +79,7 @@ export type LiveRunRecord = {
   riskAssessment: "not-assessed" | "assessed";
   scoreStatus: "verified" | "provisional";
   evidenceCoverage: { tests: boolean; safety: boolean; availableWeight: number; provisional: boolean; missing: string[] };
-  artifactEvidence?: { status: "verified" | "unavailable" | "rejected"; errors: string[]; collectorRunId: string | null; repository: string | null; workflowRunId: string | null; commitSha: string | null; testSummary?: { framework: string; total: number; passed: number; failed: number; skipped: number } };
+  artifactEvidence?: { status: "verified" | "unavailable" | "rejected"; errors: string[]; collectorRunId: string | null; repository: string | null; workflowRunId: string | null; commitSha: string | null; testSummary?: { framework: string; total: number; passed: number; failed: number; skipped: number }; agentAttribution?: import("../src/artifact-validation.js").AgentAttribution };
 };
 
 export class GitHubLiveError extends Error {
@@ -234,7 +235,7 @@ export function normalizeWorkflowRun(repository: string, raw: GitHubRunApi, jobs
     storedAt: raw.updated_at || raw.created_at,
     evidenceCount: evidence.evidence.length,
     riskCount: evaluation.riskSignals.length,
-    agent: "GitHub Actions",
+    agent: "Unattributed",
     task: raw.name || "GitHub Actions workflow",
     durationMs: run.execution.durationMs,
     url: raw.html_url,
@@ -397,7 +398,9 @@ async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi
       return { status: "rejected", errors: ["Raw test report counts do not match the provenance-bound evidence summary."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: validation.testSummary };
     }
     evidence.evidence.push(tests);
-    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: { framework: report.framework, total: report.total, passed: report.passed, failed: report.failed, skipped: report.skipped } };
+    const agentRun = bundle.evidence.find((item) => item.kind === "agent-run");
+    if (agentRun && validation.agentAttribution?.status === "verified") evidence.evidence.push(agentRun);
+    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: { framework: report.framework, total: report.total, passed: report.passed, failed: report.failed, skipped: report.skipped }, agentAttribution: validation.agentAttribution };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Evidence artifact ingestion failed.";
     return { status: "unavailable", errors: [message.slice(0, 300)], collectorRunId: null, repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
@@ -422,6 +425,11 @@ export async function getLiveRun(runId: string): Promise<LiveRunRecord & { evide
   const normalized = normalizeWorkflowRun(repository, raw, jobsPayload.jobs);
   const artifactEvidence = await collectArtifactTestEvidence(repository, raw, normalized.evidence);
   normalized.artifactEvidence = artifactEvidence;
+  normalized.agentAttribution = artifactEvidence.agentAttribution;
+  if (artifactEvidence.agentAttribution?.status === "verified") {
+    normalized.agent = artifactEvidence.agentAttribution.provider + " / " + artifactEvidence.agentAttribution.name;
+    normalized.task = artifactEvidence.agentAttribution.taskDescription || normalized.task;
+  }
   if (artifactEvidence.status !== "verified") await collectTestEvidence(repository, raw, jobsPayload.jobs, normalized.evidence);
   await collectCommitEvidence(repository, raw, normalized.evidence);
   const refreshedRun = evidenceBundleToAgentRun(normalized.evidence);

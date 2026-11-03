@@ -21,6 +21,15 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ github.event.workflow_run.id }}
         continue-on-error: true
+      - name: Download agent metadata from the original CI run
+        uses: actions/download-artifact@v4
+        with:
+          name: agentiq-agent-metadata
+          path: upstream-agent-metadata
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
       - name: Emit evidence from the original run only
         env:
           AGENTIQ_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -54,6 +63,17 @@ jobs:
           const repository = process.env.AGENTIQ_REPOSITORY;
           const workflowRunId = String(process.env.AGENTIQ_RUN_ID);
           const commitSha = process.env.AGENTIQ_SHA;
+          let agentEvidence = null;
+          const metadataPath = "upstream-agent-metadata/agentiq-run-metadata.json";
+          if (fs.existsSync(metadataPath)) {
+            const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+            const validText = (value, max) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
+            if (metadata.schemaVersion !== "1.0" || !metadata.agent || !validText(metadata.agent.provider, 100) || !validText(metadata.agent.name, 120) || !metadata.task || !validText(metadata.task.id, 160) || !validText(metadata.task.description, 1000)) {
+              throw new Error("Original-run agent metadata is malformed; refusing to attribute this run.");
+            }
+            const sourceId = "agent-metadata:" + workflowRunId + ":" + commitSha;
+            agentEvidence = { id: "agent-run:" + workflowRunId, kind: "agent-run", timestamp: now, provenance: { source: "agent-metadata", sourceId, collectedAt: now, schemaVersion: "1.0" }, data: { repository, workflowRunId, commitSha, agent: metadata.agent, model: metadata.model || {}, task: metadata.task } };
+          }
           const evidence = {
             schemaVersion: "1.0",
             evidence: [
@@ -100,6 +120,7 @@ jobs:
             ]
           };
 
+          if (agentEvidence) evidence.evidence.push(agentEvidence);
           fs.copyFileSync(reportPath, "test-results.json");
           fs.writeFileSync("agentiq-evidence.json", JSON.stringify(evidence, null, 2) + "\n");
           console.log(JSON.stringify({ repository, workflowRunId, commitSha, conclusion: process.env.AGENTIQ_CONCLUSION, tests: { total, passed, failed, skipped } }));

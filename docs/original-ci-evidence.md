@@ -41,3 +41,26 @@ The current GitHub Actions collector expects Vitest/Jest-compatible JSON fields:
 - optional `numPendingTests` and `numTodoTests`
 
 Other formats are supported by the core parser, but need an adapter that downloads the original report and binds it to the same repository/run/commit identity.
+
+## Verified AI-agent and task attribution
+
+GitHub Actions is the CI runner, not the AI coding agent. AgentIQ therefore displays a run as **Unattributed** unless the original workflow uploads an artifact named `agentiq-agent-metadata` containing `agentiq-run-metadata.json`.
+
+Configure these optional GitHub Actions repository variables when a workflow is genuinely launched by an AI coding agent:
+
+- `AGENTIQ_AGENT_PROVIDER` and `AGENTIQ_AGENT_NAME` (required)
+- `AGENTIQ_TASK_ID` and `AGENTIQ_TASK_DESCRIPTION` (required)
+- `AGENTIQ_AGENT_VERSION`, `AGENTIQ_MODEL_PROVIDER`, `AGENTIQ_MODEL_NAME`, and `AGENTIQ_MODEL_VERSION` (optional)
+
+Example metadata file:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "agent": { "provider": "openai", "name": "Codex" },
+  "model": { "provider": "openai", "name": "model-name" },
+  "task": { "id": "issue-123", "description": "Fix the pagination regression" }
+}
+```
+
+The collector downloads this file from the exact triggering CI run, then binds agent-run evidence to the original repository, workflow run ID, and commit SHA. Metadata is optional: absent metadata means **unattributed**, not an inferred agent. Agent identity is supplied by the workflow integration; AgentIQ does not independently prove which process authored the code. Do not configure these variables for ordinary CI-only runs.
