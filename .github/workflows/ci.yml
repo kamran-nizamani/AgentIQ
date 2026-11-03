@@ -31,7 +31,7 @@ jobs:
           retention-days: 14
 
       - name: Write optional AI-agent task metadata
-        if: ${{ vars.AGENTIQ_AGENT_PROVIDER != '' && vars.AGENTIQ_AGENT_NAME != '' && vars.AGENTIQ_TASK_ID != '' && vars.AGENTIQ_TASK_DESCRIPTION != '' }}
+        if: ${{ always() && vars.AGENTIQ_AGENT_PROVIDER != '' && vars.AGENTIQ_AGENT_NAME != '' && vars.AGENTIQ_TASK_ID != '' && vars.AGENTIQ_TASK_DESCRIPTION != '' }}
         env:
           AGENTIQ_AGENT_PROVIDER: ${{ vars.AGENTIQ_AGENT_PROVIDER }}
           AGENTIQ_AGENT_NAME: ${{ vars.AGENTIQ_AGENT_NAME }}
