@@ -439,7 +439,7 @@ The web dashboard includes a **Universal Repository Inspector** and an **Enginee
 - PR findings are heuristic by default. An optional server-side OpenAI-compatible model can supplement them using `AGENTIQ_AI_API_KEY`, `AGENTIQ_AI_BASE_URL`, and `AGENTIQ_AI_MODEL`.
 - Remediation plans are advisory only: this workspace does not execute repository code, push patches, or merge PRs.
 
-See [Engineering Intelligence docs](docs/engineering-intelligence.md) for score weights, environment settings, and limitations.
+See [Engineering Intelligence docs](docs/engineering-intelligence.md) for score weights, environment settings, and limitations. See [Original CI test evidence](docs/original-ci-evidence.md) for how to upload and verify test reports from the exact workflow run being evaluated.
 
 ---
 
