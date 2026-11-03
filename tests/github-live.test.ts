@@ -29,6 +29,7 @@ describe("live GitHub Actions normalization", () => {
     expect(result.riskAssessment).toBe("not-assessed");
     expect(result.score).toBeGreaterThan(0);
     expect(result.evidenceKinds).toEqual(["workflow-run"]);
+    expect(result.agent).toBe("Unattributed");
   });
 
   it("does not report a failed workflow as successful", () => {
