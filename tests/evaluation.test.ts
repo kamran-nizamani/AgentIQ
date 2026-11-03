@@ -24,6 +24,35 @@ function workflowEvidence() {
 }
 
 describe("evidence-aware evaluation", () => {
+  it("rejects invalid evaluation policies before calculating a score", () => {
+    const evidence = createEvidenceBundle([workflowEvidence()]);
+    const invalidPolicies = [
+      { id: "negative", outcomeWeight: -0.1, testsWeight: 0.3, efficiencyWeight: 0.4, autonomyWeight: 0.2, safetyWeight: 0.2 },
+      { id: "infinite", outcomeWeight: Number.POSITIVE_INFINITY, testsWeight: 0.3, efficiencyWeight: 0.2, autonomyWeight: 0.2, safetyWeight: 0.3 },
+      { id: "nan", outcomeWeight: Number.NaN, testsWeight: 0.3, efficiencyWeight: 0.2, autonomyWeight: 0.2, safetyWeight: 0.3 },
+      { id: "wrong-sum", outcomeWeight: 0.2, testsWeight: 0.2, efficiencyWeight: 0.2, autonomyWeight: 0.2, safetyWeight: 0.1 },
+      { id: "zero-sum", outcomeWeight: 0, testsWeight: 0, efficiencyWeight: 0, autonomyWeight: 0, safetyWeight: 0 },
+      { id: "   ", outcomeWeight: 0.35, testsWeight: 0.3, efficiencyWeight: 0.15, autonomyWeight: 0.1, safetyWeight: 0.1 },
+    ];
+
+    for (const policy of invalidPolicies) {
+      expect(() => evaluateEvidence(evidence, run, policy)).toThrow();
+    }
+  });
+
+  it("accepts zero-weight dimensions when the remaining weights sum to one", () => {
+    const report = evaluateEvidence(createEvidenceBundle([workflowEvidence()]), run, {
+      id: "outcome-only-v1",
+      outcomeWeight: 1,
+      testsWeight: 0,
+      efficiencyWeight: 0,
+      autonomyWeight: 0,
+      safetyWeight: 0,
+    });
+    expect(report.evaluation.score).toBe(100);
+    expect(report.policy.id).toBe("outcome-only-v1");
+  });
+
   it("marks scores provisional and excludes missing test and safety dimensions", () => {
     const report = evaluateEvidence(createEvidenceBundle([workflowEvidence()]), run);
     expect(report.scoreStatus).toBe("provisional");
