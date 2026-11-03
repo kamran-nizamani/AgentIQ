@@ -15,5 +15,5 @@ describe("evidence ingestion",()=>{
     ]);
     expect(validateEvidenceBundle(b)).toBe(true); expect(b.evidence).toHaveLength(3);
   });
-  it("rejects wrong schema version",()=>{expect(validateEvidenceBundle({schemaVersion:"0.0",evidence:[]})).toBe(false);});
+  it("preserves exact GitHub workflow provenance on parsed test evidence",()=>{\n    const evidence=ingestTestEvidence({framework:"vitest",total:3,passed:2,failed:1,sourceId:"github-actions:o/r:42:9",repository:"o/r",workflowRunId:42,commitSha:"abc123",jobId:9});\n    expect(evidence.data).toMatchObject({repository:"o/r",workflowRunId:"42",commitSha:"abc123",jobId:"9"});\n    expect(evidence.provenance.sourceId).toBe("github-actions:o/r:42:9");\n  });\n  it("rejects wrong schema version",()=>{expect(validateEvidenceBundle({schemaVersion:"0.0",evidence:[]})).toBe(false);});
 });
