@@ -3,7 +3,7 @@ import { validateEvidenceArtifact } from "../src/artifact-validation.js";
 
 const expected = { repository: "owner/repo", workflowRunId: 12345, commitSha: "abc123def456" };
 
-function artifact(overrides: { repository?: string; workflowRunId?: number; commitSha?: string; passed?: number; failed?: number } = {}) {
+function artifact(overrides: { repository?: string; workflowRunId?: number; commitSha?: string; passed?: number; failed?: number } = {}): { schemaVersion: string; evidence: Array<{ id: string; kind: string; timestamp: string; provenance: Record<string, unknown>; data: Record<string, unknown> }> } {
   const repository = overrides.repository ?? expected.repository;
   const workflowRunId = overrides.workflowRunId ?? expected.workflowRunId;
   const commitSha = overrides.commitSha ?? expected.commitSha;
