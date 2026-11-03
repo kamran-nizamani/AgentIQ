@@ -134,7 +134,10 @@ async function githubGetText(path: string): Promise<string> {
   // The Actions API redirects to a ZIP archive. Decode its text members instead of
   // feeding compressed binary bytes to the test-summary parser.
   if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
-    return readZipTextMembers(bytes).map((member) => "\n--- " + member.name + " ---\n" + member.text).join("\n").slice(-2_000_000);
+    return readZipTextMembers(bytes).map((member) => "
+--- " + member.name + " ---
+" + member.text).join("
+").slice(-2_000_000);
   }
   return new TextDecoder().decode(bytes).slice(-2_000_000);
 }
@@ -153,7 +156,11 @@ async function collectTestEvidence(repository: string, raw: GitHubRunApi, jobs: 
         failed: summary.failed,
         skipped: summary.skipped,
         durationMs: summary.durationMs,
-        sourceId: "github-actions:" + repository + ":" + raw.id + ":" + job.id,\n        repository,\n        workflowRunId: raw.id,\n        commitSha: raw.head_sha,\n        jobId: job.id,
+        sourceId: "github-actions:" + repository + ":" + raw.id + ":" + job.id,
+        repository,
+        workflowRunId: raw.id,
+        commitSha: raw.head_sha,
+        jobId: job.id,
       });
     } catch {
       // A missing or inaccessible log is not test evidence.
