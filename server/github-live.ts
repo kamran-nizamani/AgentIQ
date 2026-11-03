@@ -134,10 +134,7 @@ async function githubGetText(path: string): Promise<string> {
   // The Actions API redirects to a ZIP archive. Decode its text members instead of
   // feeding compressed binary bytes to the test-summary parser.
   if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b) {
-    return readZipTextMembers(bytes).map((member) => "
---- " + member.name + " ---
-" + member.text).join("
-").slice(-2_000_000);
+    return readZipTextMembers(bytes).map((member) => "\n--- " + member.name + " ---\n" + member.text).join("\n").slice(-2_000_000);
   }
   return new TextDecoder().decode(bytes).slice(-2_000_000);
 }
