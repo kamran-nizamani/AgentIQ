@@ -398,7 +398,9 @@ async function collectArtifactTestEvidence(repository: string, raw: GitHubRunApi
       return { status: "rejected", errors: ["Raw test report counts do not match the provenance-bound evidence summary."], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: validation.testSummary };
     }
     evidence.evidence.push(tests);
-    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: { framework: report.framework, total: report.total, passed: report.passed, failed: report.failed, skipped: report.skipped } };
+    const agentRun = bundle.evidence.find((item) => item.kind === "agent-run");
+    if (agentRun && validation.agentAttribution?.status === "verified") evidence.evidence.push(agentRun);
+    return { status: "verified", errors: [], collectorRunId: String(collector.id), repository, workflowRunId: String(raw.id), commitSha: raw.head_sha, testSummary: { framework: report.framework, total: report.total, passed: report.passed, failed: report.failed, skipped: report.skipped }, agentAttribution: validation.agentAttribution };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Evidence artifact ingestion failed.";
     return { status: "unavailable", errors: [message.slice(0, 300)], collectorRunId: null, repository, workflowRunId: String(raw.id), commitSha: raw.head_sha };
