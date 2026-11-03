@@ -29,3 +29,34 @@ jobs:
           path: test-results.json
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Write optional AI-agent task metadata
+        if: ${{ vars.AGENTIQ_AGENT_PROVIDER != '' && vars.AGENTIQ_AGENT_NAME != '' && vars.AGENTIQ_TASK_ID != '' && vars.AGENTIQ_TASK_DESCRIPTION != '' }}
+        env:
+          AGENTIQ_AGENT_PROVIDER: ${{ vars.AGENTIQ_AGENT_PROVIDER }}
+          AGENTIQ_AGENT_NAME: ${{ vars.AGENTIQ_AGENT_NAME }}
+          AGENTIQ_AGENT_VERSION: ${{ vars.AGENTIQ_AGENT_VERSION }}
+          AGENTIQ_MODEL_PROVIDER: ${{ vars.AGENTIQ_MODEL_PROVIDER }}
+          AGENTIQ_MODEL_NAME: ${{ vars.AGENTIQ_MODEL_NAME }}
+          AGENTIQ_MODEL_VERSION: ${{ vars.AGENTIQ_MODEL_VERSION }}
+          AGENTIQ_TASK_ID: ${{ vars.AGENTIQ_TASK_ID }}
+          AGENTIQ_TASK_DESCRIPTION: ${{ vars.AGENTIQ_TASK_DESCRIPTION }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const metadata = {
+            schemaVersion: "1.0",
+            agent: { provider: process.env.AGENTIQ_AGENT_PROVIDER, name: process.env.AGENTIQ_AGENT_NAME, version: process.env.AGENTIQ_AGENT_VERSION || undefined },
+            model: { provider: process.env.AGENTIQ_MODEL_PROVIDER || undefined, name: process.env.AGENTIQ_MODEL_NAME || undefined, version: process.env.AGENTIQ_MODEL_VERSION || undefined },
+            task: { id: process.env.AGENTIQ_TASK_ID, description: process.env.AGENTIQ_TASK_DESCRIPTION }
+          };
+          fs.writeFileSync("agentiq-run-metadata.json", JSON.stringify(metadata, null, 2) + "\n");
+          NODE
+      - name: Upload original-run AI-agent metadata
+        if: ${{ vars.AGENTIQ_AGENT_PROVIDER != '' && vars.AGENTIQ_AGENT_NAME != '' && vars.AGENTIQ_TASK_ID != '' && vars.AGENTIQ_TASK_DESCRIPTION != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentiq-agent-metadata
+          path: agentiq-run-metadata.json
+          if-no-files-found: error
+          retention-days: 14
