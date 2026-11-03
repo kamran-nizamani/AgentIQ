@@ -20,8 +20,13 @@ export interface ScoreDimensionExplanation {
 export interface EvaluationReport { evaluation:AgentEvaluation; policy:EvaluationPolicy; riskSignals:RiskSignal[]; evidenceIds:string[]; evidenceCoverage:EvidenceCoverage; scoreStatus:"verified"|"provisional"; scoreExplanation:ScoreDimensionExplanation[]; }
 
 export function evaluateEvidence(bundle:EvidenceBundle, run:AgentRun, policy:EvaluationPolicy=DEFAULT_POLICY): EvaluationReport {
-  const sum=policy.outcomeWeight+policy.testsWeight+policy.efficiencyWeight+policy.autonomyWeight+policy.safetyWeight;
-  if(Math.abs(sum-1)>1e-9) throw new Error("Evaluation policy weights must sum to 1.");
+  const weights = [policy.outcomeWeight, policy.testsWeight, policy.efficiencyWeight, policy.autonomyWeight, policy.safetyWeight];
+  if (!policy.id.trim()) throw new Error("Evaluation policy id must not be empty.");
+  if (weights.some((weight) => !Number.isFinite(weight) || weight < 0)) {
+    throw new Error("Evaluation policy weights must be finite, non-negative numbers.");
+  }
+  const sum = weights.reduce((total, weight) => total + weight, 0);
+  if (Math.abs(sum - 1) > 1e-9) throw new Error("Evaluation policy weights must sum to 1.");
   const base=evaluateAgentRun(run);
   const b=base.breakdown;
   const testsAvailable=bundle.evidence.some(e=>e.kind==="test-suite");
