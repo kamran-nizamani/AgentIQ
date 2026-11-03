@@ -27,7 +27,7 @@ function artifact(overrides: { repository?: string; workflowRunId?: number; comm
         id: "test-suite:vitest:" + workflowRunId,
         kind: "test-suite",
         timestamp: "2026-10-11T19:00:00.000Z",
-        provenance: { ...provenance("vitest:" + workflowRunId), source: "test-report" },
+        provenance: { ...provenance("vitest:" + workflowRunId + ":" + commitSha), source: "test-report" },
         data: {
           repository,
           workflowRunId,
