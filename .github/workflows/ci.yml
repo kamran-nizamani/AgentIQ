@@ -19,4 +19,13 @@ jobs:
       - run: npm run api:typecheck
       - run: npm run web:typecheck
       - run: npm run web:build
-      - run: npm test
+      - name: Run tests and write an original-run report
+        run: npm test -- --reporter=json --outputFile=test-results.json
+      - name: Upload original-run test report for AgentIQ
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentiq-test-results
+          path: test-results.json
+          if-no-files-found: ignore
+          retention-days: 14
