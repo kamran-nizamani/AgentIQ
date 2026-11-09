@@ -75,3 +75,5 @@ tbody tr:hover td { background: var(--surface-2); }
 @media (max-width: 760px) { .topnav { margin: 8px 8px 0; top: 8px; border-radius: 16px; } }
 .brand-mark { fill: #fff; }
 .brand-mark .gap { stroke: rgba(255,255,255,.6); }
+.drawer-backdrop { z-index: 60; }
+.detail-panel { z-index: 61; }

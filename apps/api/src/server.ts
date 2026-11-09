@@ -71,7 +71,9 @@ function createDefaultStore(): AgentRunStore {
   const filename = process.env.AGENTIQ_DB_PATH ?? "./data/agentiq.sqlite";
   if (filename !== ":memory:") mkdirSync(dirname(filename), { recursive: true });
   const store = new SQLiteAgentRunStore(filename);
-  if (process.env.AGENTIQ_DEMO !== "false") {
+  // Demo rows are only seeded when no real repository is configured, so fake and real data never mix.
+  const seedDemo = process.env.AGENTIQ_DEMO === "true" || (process.env.AGENTIQ_DEMO !== "false" && !process.env.AGENTIQ_GITHUB_REPOSITORY);
+  if (seedDemo) {
     void store.count().then((count) => {
       if (count === 0) {
         void createDemoStoreRecords().then((records) => Promise.all(records.map((record) => store.save(record))));
@@ -88,9 +90,10 @@ async function createDemoStoreRecords(): Promise<StoredAgentRun[]> {
 
 async function collectGitHubRuns(store: AgentRunStore): Promise<{ collected: number; repository: string }> {
   const repository = process.env.AGENTIQ_GITHUB_REPOSITORY;
-  const token = process.env.GITHUB_TOKEN;
-  if (!repository || !token) throw new Error("Configure AGENTIQ_GITHUB_REPOSITORY and GITHUB_TOKEN before collecting GitHub evidence.");
-  const collector = createGitHubApiCollector(repository, { token });
+  // A token is optional: public repositories work without one, at GitHub's lower anonymous rate limit.
+  const token = process.env.GITHUB_TOKEN || undefined;
+  if (!repository) throw new Error("Set AGENTIQ_GITHUB_REPOSITORY=owner/repo to choose the repository to collect from.");
+  const collector = createGitHubApiCollector(repository, token ? { token } : {});
   const workflows = await collector.workflowRuns(25);
   let collected = 0;
   for (const workflow of workflows) {
@@ -115,6 +118,26 @@ async function collectGitHubRuns(store: AgentRunStore): Promise<{ collected: num
     collected += 1;
   }
   return { collected, repository };
+}
+
+/** Pull live runs now, then keep pulling. Failures are logged, never fatal: the API keeps serving stored runs. */
+export function startAutoSync(store: AgentRunStore, log: (message: string) => void = console.log): () => void {
+  if (!process.env.AGENTIQ_GITHUB_REPOSITORY || process.env.AGENTIQ_AUTO_SYNC === "false") return () => undefined;
+  const sync = async () => {
+    try {
+      const result = await collectGitHubRuns(store);
+      log(`Synced ${result.collected} run(s) from ${result.repository}.`);
+    } catch (error) {
+      const hint = error instanceof Error && /bad credentials/i.test(error.message) ? " The GITHUB_TOKEN is invalid or expired; unset it for a public repository or create a new one." : "";
+      log(`GitHub sync failed: ${error instanceof Error ? error.message : String(error)}.${hint}`);
+    }
+  };
+  void sync();
+  const minutes = Number(process.env.AGENTIQ_SYNC_INTERVAL_MINUTES ?? 10);
+  if (!Number.isFinite(minutes) || minutes <= 0) return () => undefined;
+  const timer = setInterval(() => void sync(), minutes * 60_000);
+  timer.unref();
+  return () => clearInterval(timer);
 }
 
 export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
@@ -191,6 +214,8 @@ export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
 }
 
 if (process.env.NODE_ENV !== "test") {
-  const server = createServer(createApiHandler());
+  const store = createDefaultStore();
+  const server = createServer(createApiHandler(store));
+  startAutoSync(store);
   server.listen(PORT, HOST, () => console.log(`AgentIQ API listening on http://${HOST}:${PORT}`));
 }
