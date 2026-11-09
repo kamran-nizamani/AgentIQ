@@ -117,7 +117,7 @@
 .intel-repo-head a{font:600 13px var(--font-display);text-decoration:none;overflow-wrap:anywhere}
 .intel-repo-head p{margin:7px 0 0;font-size:10px;line-height:1.6}
 .intel-grade{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:60px;padding:7px}
-.intel-grade strong{font:600 24px var(--font-display)
+.intel-grade strong{font:600 24px var(--font-display)}
 .intel-grade span{font-size:8px}
 .intel-health-track{height:5px;overflow:hidden;margin:16px 0 12px}
 .intel-health-track i{display:block;height:100%;border-radius:inherit}
@@ -127,7 +127,7 @@
 .intel-component-list > div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0}
 .intel-component-list > div > span{font-size:10px}
 .intel-component-list small{display:block;margin-top:4px;max-width:320px;font-size:9px;line-height:1.5}
-.intel-component-list strong{min-width:32px;text-align:right;font:600 13px var(--font-display)
+.intel-component-list strong{min-width:32px;text-align:right;font:600 13px var(--font-display)}
 .intel-card-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding-top:13px;font-size:9px}
 .intel-card-footer button{padding:0;border:0;background:none;font-size:9px}
 .intel-failed-card p{font-size:11px;line-height:1.5}
@@ -137,7 +137,7 @@
 .intel-section-head h3{margin:0;font:600 14px var(--font-display);overflow-wrap:anywhere}
 .intel-section-head p{margin:5px 0 0;font-size:10px;line-height:1.6}
 .intel-section-head > strong{flex:0 0 auto;font:600 20px var(--font-display);text-align:right}
-.intel-section-head > strong small{display:block;margin-top:4px;font:400 9px var(--font-body)
+.intel-section-head > strong small{display:block;margin-top:4px;font:400 9px var(--font-body)}
 .intel-note{margin:12px 0;font-size:10px;line-height:1.7}
 .intel-failure-list{display:flex;flex-direction:column}
 .intel-failure{display:grid;grid-template-columns:25px minmax(0, 1fr) auto;gap:12px;align-items:start;padding:14px 0}
@@ -157,12 +157,12 @@
 .intel-finding small{display:block;font-size:9px;line-height:1.6;overflow-wrap:anywhere}
 .intel-alert{display:grid;grid-template-columns:70px minmax(0, 1fr) auto;gap:12px;align-items:center;padding:13px 0}
 .intel-plan-panel{padding:20px}
-.intel-plan-panel h3{margin:8px 0 0;font:600 15px var(--font-display)
+.intel-plan-panel h3{margin:8px 0 0;font:600 15px var(--font-display)}
 .intel-plan-panel ol{margin:18px 0;padding-left:20px}
 .intel-plan-panel li{padding:0 0 10px 5px;font-size:11px;line-height:1.7}
 .intel-empty-state{display:flex;flex-direction:column;align-items:center;padding:42px 20px;text-align:center}
 .intel-empty-icon{display:grid;place-items:center;width:42px;height:42px;font-size:20px}
-.intel-empty-state h3{margin:15px 0 7px;font:600 15px var(--font-display)
+.intel-empty-state h3{margin:15px 0 7px;font:600 15px var(--font-display)}
 .intel-empty-state p{max-width:540px;margin:0 0 18px;font-size:11px;line-height:1.7}
 .intel-disclaimer{margin:0;font-size:9px;line-height:1.7}
 @media (max-width: 1050px){
@@ -190,11 +190,11 @@
 .repo-runs-heading h3{margin:7px 0 6px;font:600 19px/1.25 var(--font-display);letter-spacing:-.03em}
 .repo-runs-heading p{max-width:740px;margin:0;font-size:11px;line-height:1.7}
 .repo-runs-total{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.repo-runs-total strong{font:600 25px var(--font-display)
+.repo-runs-total strong{font:600 25px var(--font-display)}
 .repo-runs-total span{font-size:9px}
 .repo-runs-filters{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;padding:15px 0}
 .repo-runs-filters label{display:flex;flex-direction:column;gap:6px;font-size:9px;min-width:125px}
-.repo-runs-filters select,.repo-runs-filters input{min-height:36px;max-width:100%;padding:8px 10px;font:10px var(--font-body)
+.repo-runs-filters select,.repo-runs-filters input{min-height:36px;max-width:100%;padding:8px 10px;font:10px var(--font-body)}
 .repo-runs-filters .repo-runs-branch{flex:1 1 180px}
 .repo-runs-filters button{min-height:36px}
 .repo-runs-clear{border:0;background:transparent;font-size:10px}

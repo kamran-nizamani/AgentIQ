@@ -1,0 +1,77 @@
+/* Modern layer: a floating ink nav, and a cobalt "evidence band" hero where the Evidence Bar is the focal point.
+   The hatch pattern in the band's corner is the same hatch used for missing evidence. */
+:root {
+  --canvas: #eceef7;
+  --surface: #ffffff;
+  --surface-2: #f5f6fc;
+  --line: #e0e3f0;
+  --cobalt: #2438f5;
+  --nav-ink: #0e1330;
+  --radius-panel: 18px;
+  --good: #0f8f64;
+  --warn: #b26b00;
+  --bad: #d23a2e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #080b1a;
+    --surface: #10152b;
+    --surface-2: #151b35;
+    --line: #222a4a;
+    --cobalt: #2c3df0;
+    --nav-ink: #10152b;
+  }
+}
+body { background: var(--canvas); }
+body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 420px; z-index: -1; pointer-events: none;
+  background: radial-gradient(900px 300px at 85% -40px, rgba(36,56,245,.14), transparent 70%); }
+
+/* Floating nav */
+.topnav { top: 12px; margin: 12px 16px 0; background: var(--nav-ink); border: 0; border-radius: 20px; box-shadow: 0 10px 30px -12px rgba(14,19,48,.5); }
+.topnav-inner { height: 56px; padding: 0 12px 0 20px; max-width: 1280px; }
+.brand, .brand * { color: #fff; }
+.nav-list { align-items: center; gap: 2px; }
+.nav-item { color: rgba(255,255,255,.62); padding: 7px 14px; border-radius: 999px; transition: background .15s, color .15s; }
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.08); }
+.nav-item.active { color: var(--nav-ink); background: #fff; font-weight: 600; }
+.nav-item.active::after { display: none; }
+.nav-item em { background: rgba(255,255,255,.14); color: #fff; }
+.nav-item.active em { background: rgba(14,19,48,.1); color: var(--nav-ink); }
+.top-actions .search-box { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+.top-actions .search-box input, .top-actions .search-box span { color: rgba(255,255,255,.7); }
+.top-actions .search-box input::placeholder { color: rgba(255,255,255,.5); }
+.top-actions .search-box kbd { background: rgba(255,255,255,.12); color: #fff; border-color: transparent; }
+.top-actions .icon-button, .top-actions button:not(.search-box) { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+
+/* Evidence band hero (Overview only) */
+.hero:has(.hero-score) { position: relative; overflow: hidden; background: var(--cobalt); color: #fff; border-radius: 28px; padding: clamp(24px, 4vw, 44px); align-items: end; }
+.hero:has(.hero-score)::after { content: ""; position: absolute; right: -60px; top: -60px; width: 260px; height: 260px; border-radius: 50%;
+  background: repeating-linear-gradient(135deg, rgba(255,255,255,.22) 0 2px, transparent 2px 9px); pointer-events: none; }
+.hero:has(.hero-score) > * { position: relative; z-index: 1; }
+.hero:has(.hero-score) h1 { color: #fff; font-size: clamp(30px, 3.6vw, 52px); }
+.hero:has(.hero-score) .hero-status, .hero:has(.hero-score) .hero-score-note, .hero:has(.hero-score) .hero-score-figure span { color: rgba(255,255,255,.78); }
+.hero:has(.hero-score) .live-dot { background: #6dffb8; box-shadow: 0 0 0 4px rgba(109,255,184,.25); }
+.hero:has(.hero-score) .hero-score-figure strong { color: #fff; font-size: clamp(64px, 8vw, 112px); }
+.hero:has(.hero-score) .text-button { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.hero:has(.hero-score) .ebar-seg::before { background: rgba(255,255,255,.2); }
+.hero:has(.hero-score) .ebar-seg i.band-good { background: #6dffb8; }
+.hero:has(.hero-score) .ebar-seg i.band-mid { background: #ffd166; }
+.hero:has(.hero-score) .ebar-seg i.band-bad { background: #ff8a7a; }
+.hero:has(.hero-score) .ebar-seg.is-missing::before { background: repeating-linear-gradient(135deg, rgba(255,255,255,.5) 0 1.5px, transparent 1.5px 6px); box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+.hero:has(.hero-score) .ebar-seg small { color: rgba(255,255,255,.75); }
+.hero:has(.hero-score) .ebar-seg small b { color: #fff; }
+.hero:has(.hero-score) .ebar-lg { --h: 20px; gap: 5px; }
+.hero:has(.hero-score) .ebar-seg::before, .hero:has(.hero-score) .ebar-seg i { border-radius: 6px; }
+
+/* Quieter content around the band */
+.panel, .metrics-grid { border-radius: var(--radius-panel); border-color: var(--line); }
+.metrics-grid { box-shadow: 0 1px 0 rgba(14,19,48,.04); }
+.metric-value { color: var(--ink); }
+.panel-head h2 { font-size: 19px; }
+.status-pill, .status { font-weight: 600; }
+tbody tr:hover td { background: var(--surface-2); }
+.segmented button.selected { background: var(--nav-ink); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .segmented button.selected { background: var(--cobalt); } }
+@media (max-width: 760px) { .topnav { margin: 8px 8px 0; top: 8px; border-radius: 16px; } }
+.brand-mark { fill: #fff; }
+.brand-mark .gap { stroke: rgba(255,255,255,.6); }
