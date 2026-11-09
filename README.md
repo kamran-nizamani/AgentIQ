@@ -445,6 +445,8 @@ See [Engineering Intelligence docs](docs/engineering-intelligence.md) for score 
 
 # Roadmap
 
+> The current, code-verified status of every phase and the next milestones are in [ROADMAP.md](ROADMAP.md).
+
 The roadmap is intentionally staged.
 
 The order is important:
@@ -519,19 +521,19 @@ Goal: establish a clean, typed, deterministic foundation.
 
 # Phase 1 — Evidence Ingestion
 
-**Status: 🟢 In progress**
+**Status: 🟢 Implemented in the library; see [ROADMAP.md](ROADMAP.md) for what is not yet surfaced in the API and dashboard**
 
 Goal: turn real agent execution evidence into canonical `AgentRun` objects.
 
 ### GitHub Actions ingestion
 
-- [ ] Parse workflow run metadata.
-- [ ] Identify agent-related workflows.
+- [x] Parse workflow run metadata.
+- [x] Identify agent-related workflows.
 - [x] Capture job status.
-- [ ] Capture step status.
-- [ ] Capture duration.
-- [ ] Capture artifacts.
-- [ ] Capture test reports.
+- [x] Capture step status.
+- [x] Capture duration.
+- [x] Capture artifacts.
+- [x] Capture test reports.
 - [x] Capture commit SHA.
 - [x] Capture PR association.
 - [x] Normalize CI evidence.
@@ -545,16 +547,16 @@ Goal: turn real agent execution evidence into canonical `AgentRun` objects.
 - [x] Provenance metadata.
 - [x] Timestamp normalization.
 - [x] Source identifiers.
-- [ ] Evidence confidence.
+- [x] Evidence confidence.
 
 ### Test evidence
 
-- [ ] JUnit XML.
-- [ ] Vitest/Jest output.
-- [ ] Pytest output.
+- [x] JUnit XML.
+- [x] Vitest/Jest output.
+- [x] Pytest output.
 - [x] Generic test result adapter.
-- [ ] Coverage evidence.
-- [ ] Failure classification.
+- [x] Coverage evidence.
+- [x] Failure classification.
 
 ### Exit criteria
 
@@ -564,44 +566,44 @@ A GitHub Actions run should be convertible into a valid canonical `AgentRun` wit
 
 # Phase 2 — GitHub Intelligence
 
-**Status: ⚪ Planned**
+**Status: 🟢 Implemented in the library (`collectGitHubIntelligence`); API and dashboard wiring is the next step, see [ROADMAP.md](ROADMAP.md)**
 
 Goal: understand what happened to an agent-generated change inside a real GitHub repository.
 
 ### Repository analysis
 
-- [ ] Repository metadata.
-- [ ] Default branch.
-- [ ] Base commit.
-- [ ] Changed files.
-- [ ] Diff statistics.
-- [ ] Language breakdown.
-- [ ] Test files changed.
-- [ ] Configuration files changed.
+- [x] Repository metadata.
+- [x] Default branch.
+- [x] Base commit.
+- [x] Changed files.
+- [x] Diff statistics.
+- [x] Language breakdown.
+- [x] Test files changed.
+- [x] Configuration files changed.
 
 ### Pull request analysis
 
-- [ ] PR metadata.
-- [ ] Labels.
-- [ ] Review count.
-- [ ] Review decisions.
-- [ ] Requested changes.
-- [ ] Merge status.
-- [ ] Time to merge.
-- [ ] Reopened PR detection.
-- [ ] CI history.
+- [x] PR metadata.
+- [x] Labels.
+- [x] Review count.
+- [x] Review decisions.
+- [x] Requested changes.
+- [x] Merge status.
+- [x] Time to merge.
+- [x] Reopened PR detection.
+- [x] CI history.
 
 ### Change risk signals
 
-- [ ] Dependency changes.
-- [ ] Authentication changes.
-- [ ] Authorization changes.
-- [ ] Secrets/configuration changes.
-- [ ] Database migrations.
-- [ ] Infrastructure changes.
-- [ ] Large diffs.
-- [ ] Generated files.
-- [ ] Sensitive paths.
+- [x] Dependency changes.
+- [x] Authentication changes.
+- [x] Authorization changes.
+- [x] Secrets/configuration changes.
+- [x] Database migrations.
+- [x] Infrastructure changes.
+- [x] Large diffs.
+- [x] Generated files.
+- [x] Sensitive paths.
 
 ### Exit criteria
 
@@ -1638,9 +1640,9 @@ Build the measurement layer for AI-powered software engineering.
 - [x] Pull request lifecycle evidence
 - [x] Review decision evidence
 - [x] GitHub API collector
-- [ ] CI/workflow history collector
-- [ ] Review/comment evidence collector
-- [ ] Risk signal extraction
+- [x] CI/workflow history collector
+- [x] Review/comment evidence collector
+- [x] Risk signal extraction
 
 
 ## Durable production run history

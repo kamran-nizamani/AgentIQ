@@ -1,5 +1,5 @@
 import type { GitHubCollector } from "./github-collector.js";
-import type { GitHubCommitSnapshot, GitHubPullRequestSnapshot, GitHubRepositorySnapshot } from "./github-intelligence.js";
+import type { GitHubCommitSnapshot, GitHubIssueEventSnapshot, GitHubPullRequestFileSnapshot, GitHubPullRequestSnapshot, GitHubRepositorySnapshot } from "./github-intelligence.js";
 import type { GitHubCommentSnapshot, GitHubReviewSnapshot, GitHubWorkflowJobSnapshot, GitHubWorkflowRunSnapshot } from "./github-ci.js";
 
 export interface GitHubApiCollectorOptions {
@@ -61,6 +61,12 @@ function repositoryFromJson(value: unknown): GitHubRepositorySnapshot {
   };
 }
 
+function loginOf(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const login = (value as JsonRecord).login;
+  return typeof login === "string" ? login : null;
+}
+
 function commitFromJson(value: unknown): GitHubCommitSnapshot {
   const data = asRecord(value, "commit");
   const commit = asRecord(data.commit, "commit.commit");
@@ -94,6 +100,12 @@ function pullRequestFromJson(value: unknown): GitHubPullRequestSnapshot {
     createdAt: asString(data.created_at, "created_at", "pull request"),
     updatedAt: typeof data.updated_at === "string" ? data.updated_at : null,
     mergedAt: typeof data.merged_at === "string" ? data.merged_at : null,
+    labels: Array.isArray(data.labels)
+      ? data.labels.map((label) => (label && typeof label === "object" ? (label as JsonRecord).name : undefined)).filter((name): name is string => typeof name === "string")
+      : [],
+    draft: data.draft === true,
+    author: loginOf(data.user),
+    mergedBy: loginOf(data.merged_by),
   };
 }
 
@@ -196,6 +208,7 @@ export class GitHubApiCollector implements GitHubCollector {
           updatedAt: asString(data.updated_at, "updated_at", "workflow run"),
           runAttempt: typeof data.run_attempt === "number" ? data.run_attempt : undefined,
           workflowPath: typeof data.path === "string" ? data.path : null,
+          actor: loginOf(data.triggering_actor) ?? loginOf(data.actor),
           htmlUrl: typeof data.html_url === "string" ? data.html_url : null,
         };
       },
@@ -268,6 +281,41 @@ export class GitHubApiCollector implements GitHubCollector {
           updatedAt: typeof data.updated_at === "string" ? data.updated_at : null,
           path: typeof data.path === "string" ? data.path : null,
           line: typeof data.line === "number" ? data.line : null,
+        };
+      },
+      limit,
+    );
+  }
+
+  /** Changed files of a pull request, as GitHub lists them (capped by `limit`; GitHub itself caps this list at 3000). */
+  async pullRequestFiles(pullRequestNumber: number, limit = 300): Promise<GitHubPullRequestFileSnapshot[]> {
+    return this.getAll(
+      `/repos/${this.repositoryFullName}/pulls/${pullRequestNumber}/files`,
+      (value) => {
+        const data = asRecord(value, "pull request file");
+        return {
+          filename: asString(data.filename, "filename", "pull request file"),
+          status: asString(data.status, "status", "pull request file"),
+          additions: typeof data.additions === "number" ? data.additions : 0,
+          deletions: typeof data.deletions === "number" ? data.deletions : 0,
+          previousFilename: typeof data.previous_filename === "string" ? data.previous_filename : null,
+        };
+      },
+      limit,
+    );
+  }
+
+  /** Timeline events of a PR (via the issues API), used to detect reopening. */
+  async pullRequestEvents(pullRequestNumber: number, limit = 100): Promise<GitHubIssueEventSnapshot[]> {
+    return this.getAll(
+      `/repos/${this.repositoryFullName}/issues/${pullRequestNumber}/events`,
+      (value) => {
+        const data = asRecord(value, "pull request event");
+        return {
+          id: asNumber(data.id, "id", "pull request event"),
+          event: asString(data.event, "event", "pull request event"),
+          createdAt: asString(data.created_at, "created_at", "pull request event"),
+          actor: loginOf(data.actor),
         };
       },
       limit,

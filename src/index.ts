@@ -31,3 +31,22 @@ export { InMemoryAgentRunStore, toRunHistoryRow } from "./storage.js";
 
 export type { TestReportFormat, ParsedTestReport } from "./test-report-parser.js";
 export { parseTestReport } from "./test-report-parser.js";
+
+export type { ChangedFile, FileCategory, LanguageStat, SensitiveFile, ChangeAnalysis } from "./change-analysis.js";
+export { analyzeChangedFiles, changeAnalysisToDiffEvidence, classifyPath, classifySensitivePath, isSecretsConfigPath, languageOf } from "./change-analysis.js";
+
+export type { JobTelemetry, AgentWorkflowOptions, AgentWorkflowMatch, WorkflowHistory, CiHistorySummary } from "./ci-intelligence.js";
+export { durationBetween, summarizeJob, ingestWorkflowStepEvidence, identifyAgentWorkflow, summarizeCiHistory } from "./ci-intelligence.js";
+
+export type { LifecycleStageName, LifecycleStage, ReviewDecision, MergeStatus, PullRequestLifecycle, PullRequestLifecycleInput } from "./pr-lifecycle.js";
+export { buildPullRequestLifecycle, deriveReviewDecision } from "./pr-lifecycle.js";
+
+export type { ConfidenceLevel, EvidenceConfidence, BundleConfidence } from "./evidence-confidence.js";
+export { scoreEvidenceConfidence, scoreBundleConfidence } from "./evidence-confidence.js";
+
+export type { CoverageFormat, CoverageMetric, ParsedCoverage, CoverageEvidenceInput, FailureClass, FailureClassification, TestFailure } from "./test-analysis.js";
+export { parseCoverageReport, ingestCoverageEvidence, classifyFailure, extractJUnitFailures, summarizeFailures } from "./test-analysis.js";
+
+export type { GitHubPullRequestFileSnapshot, GitHubIssueEventSnapshot } from "./github-intelligence.js";
+export type { GitHubIntelligence, GitHubIntelligenceOptions } from "./github-collector.js";
+export { collectGitHubIntelligence } from "./github-collector.js";
