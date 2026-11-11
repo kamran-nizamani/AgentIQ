@@ -11,7 +11,7 @@ import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot } from "../../../s
 import { InMemoryAgentRunStore, toRunHistoryRow, type AgentRunStore, type StoredAgentRun } from "../../../src/storage.js";
 import { SQLiteAgentRunStore } from "./sqlite-store.js";
 import type { AgentRun } from "../../../src/types.js";
-import { createHanzoDecision, HanzoDecisionError } from "./hanzo-decisions.js";
+import { createHanzoDecision, createMockHanzoDecision, HanzoDecisionError } from "./hanzo-decisions.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";
