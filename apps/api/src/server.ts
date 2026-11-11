@@ -11,6 +11,7 @@ import { ingestWorkflowJobSnapshot, ingestWorkflowRunSnapshot } from "../../../s
 import { InMemoryAgentRunStore, toRunHistoryRow, type AgentRunStore, type StoredAgentRun } from "../../../src/storage.js";
 import { SQLiteAgentRunStore } from "./sqlite-store.js";
 import type { AgentRun } from "../../../src/types.js";
+import { createHanzoDecision, HanzoDecisionError } from "./hanzo-decisions.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -117,6 +118,35 @@ async function collectGitHubRuns(store: AgentRunStore): Promise<{ collected: num
   return { collected, repository };
 }
 
+async function readJsonBody(req: IncomingMessage): Promise<{
+  model?: string;
+  state: Record<string, unknown>;
+  questions: Record<string, import("./hanzo-decisions.js").HanzoQuestion>;
+}> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > 64 * 1024) throw new Error("Request body must be 64 KB or smaller.");
+    chunks.push(buffer);
+  }
+  let parsed: unknown;
+  try { parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  catch { throw new Error("Request body must contain valid JSON."); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Request body must be a JSON object.");
+  const body = parsed as Record<string, unknown>;
+  if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) throw new Error("A state object is required.");
+  if (!body.questions || typeof body.questions !== "object" || Array.isArray(body.questions) || Object.keys(body.questions).length === 0) {
+    throw new Error("At least one named question is required.");
+  }
+  return {
+    ...(typeof body.model === "string" ? { model: body.model } : {}),
+    state: body.state as Record<string, unknown>,
+    questions: body.questions as Record<string, import("./hanzo-decisions.js").HanzoQuestion>,
+  };
+}
+
 export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
   const storageMode = store instanceof SQLiteAgentRunStore ? "sqlite" : "in-memory-demo";
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -134,6 +164,32 @@ export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
         json(res, 200, { data: result, meta: { mode: storageMode } });
       } catch (error) {
         json(res, 502, { error: { code: "INGESTION_FAILED", message: error instanceof Error ? error.message : "GitHub ingestion failed." } });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/decisions") {
+      try {
+        const body = await readJsonBody(req);
+        const result = await createHanzoDecision(body);
+        json(res, 200, { data: result });
+      } catch (error) {
+        if (error instanceof HanzoDecisionError) {
+          json(res, error.status, {
+            error: {
+              code: error.code ?? "HANZO_DECISION_FAILED",
+              message: error.message,
+              ...(error.actions ? { actions: error.actions } : {}),
+            },
+          });
+          return;
+        }
+        json(res, 400, {
+          error: {
+            code: "INVALID_REQUEST",
+            message: error instanceof Error ? error.message : "The decision request could not be processed.",
+          },
+        });
       }
       return;
     }
