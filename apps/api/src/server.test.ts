@@ -81,6 +81,38 @@ describe("AgentIQ HTTP API", () => {
     }
   });
 
+
+  it("runs Hanzo decisions in explicit offline mock mode without an API key", async () => {
+    const previousKey = process.env.HANZO_API_KEY;
+    const previousMockMode = process.env.HANZO_MOCK_MODE;
+    delete process.env.HANZO_API_KEY;
+    process.env.HANZO_MOCK_MODE = "true";
+    try {
+      const response = await request(`${baseUrl}/api/decisions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          state: { message: "Production API is returning 502 gateway errors" },
+          questions: {
+            team: { type: "choice", instructions: "Choose a team", criteria: { infrastructure: "network gateway outages 502 errors", billing: "invoices payments" } },
+            critical: { type: "noul", instructions: "Page on-call?" },
+          },
+        }),
+      });
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.meta.mode).toBe("mock");
+      expect(body.data.mock).toBe(true);
+      expect(body.data.answers.team.choice).toBe("infrastructure");
+      expect(body.data.answers.critical.noul).toBe(0.9);
+    } finally {
+      if (previousKey === undefined) delete process.env.HANZO_API_KEY;
+      else process.env.HANZO_API_KEY = previousKey;
+      if (previousMockMode === undefined) delete process.env.HANZO_MOCK_MODE;
+      else process.env.HANZO_MOCK_MODE = previousMockMode;
+    }
+  });
+
   it("preserves Hanzo billing and rate-limit refusals", async () => {
     const previousKey = process.env.HANZO_API_KEY;
     process.env.HANZO_API_KEY = "test-hanzo-key";
