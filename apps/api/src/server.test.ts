@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
 import { createApiHandler, createDemoStore } from "./server.js";
 
+const request = globalThis.fetch.bind(globalThis);
+
 describe("AgentIQ HTTP API", () => {
   let server: Server;
   let baseUrl: string;
@@ -54,7 +56,7 @@ describe("AgentIQ HTTP API", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const response = await fetch(`${baseUrl}/api/decisions`, {
+      const response = await request(`${baseUrl}/api/decisions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
