@@ -171,8 +171,9 @@ export function createApiHandler(store: AgentRunStore = createDefaultStore()) {
     if (req.method === "POST" && url.pathname === "/api/decisions") {
       try {
         const body = await readJsonBody(req);
-        const result = await createHanzoDecision(body);
-        json(res, 200, { data: result });
+        const mockMode = process.env.HANZO_MOCK_MODE === "true";
+        const result = mockMode ? createMockHanzoDecision(body) : await createHanzoDecision(body);
+        json(res, 200, { data: result, meta: { mode: mockMode ? "mock" : "live", note: mockMode ? "Deterministic local mock; no Hanzo API request was made." : "Live Hanzo Decisions response." } });
       } catch (error) {
         if (error instanceof HanzoDecisionError) {
           json(res, error.status, {
