@@ -61,6 +61,23 @@ AgentIQ starts with a deterministic evaluation core and grows toward a complete 
 
 ---
 
+## Run it on your own repository
+
+```bash
+git clone https://github.com/kamran-nizamani/AgentIQ && cd AgentIQ
+npm install
+cp .env.example .env      # set AGENTIQ_GITHUB_REPOSITORY=owner/repo (and GITHUB_TOKEN, optional)
+npm run dev               # http://localhost:5173
+```
+
+The dashboard reads live GitHub Actions runs for the repository you name, scores them, and shows what evidence is missing instead of guessing.
+
+- **No token needed for public repositories**, but GitHub limits anonymous requests to 60 per hour. For anything beyond a quick look, create a fine-grained read-only token (Actions, Contents, Pull requests, Metadata) and set `GITHUB_TOKEN`. It also unlocks private repositories.
+- An invalid or expired `GITHUB_TOKEN` fails with "Bad credentials". Unset it or replace it.
+- `npm run dev` serves the same `api/*.ts` handlers that Vercel runs in production, so what you see locally is what deploys.
+- `npm run dev:sqlite` starts the older standalone API with a SQLite store (`apps/api`) for ingesting runs from your own pipeline. It auto-syncs from GitHub when `AGENTIQ_GITHUB_REPOSITORY` is set (`AGENTIQ_SYNC_INTERVAL_MINUTES`, default 10; `AGENTIQ_AUTO_SYNC=false` to disable).
+- Deploying: import the repository into Vercel and set the same two variables.
+
 ## Vision
 
 AI coding agents are becoming capable of writing code, fixing bugs, running tests, opening pull requests, and completing multi-step engineering tasks.
