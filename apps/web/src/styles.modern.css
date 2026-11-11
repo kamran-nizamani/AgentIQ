@@ -77,3 +77,33 @@ tbody tr:hover td { background: var(--surface-2); }
 .brand-mark .gap { stroke: rgba(255,255,255,.6); }
 .drawer-backdrop { z-index: 60; }
 .detail-panel { z-index: 61; }
+
+/* ---- Typography and layout pass ---- */
+html { font-size: 16px; }
+body { font-size: 15px; line-height: 1.5; font-feature-settings: "tnum" 0; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+.ebar-wrap { display: block; width: 100%; min-width: 0; }
+.ebar-legend { display: none; list-style: none; margin: 12px 0 0; padding: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 13px; }
+.ebar-legend li { display: flex; align-items: center; gap: 8px; }
+.ebar-legend li b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ebar-legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--muted); flex: none; }
+.ebar-legend i.band-good { background: #6dffb8; } .ebar-legend i.band-mid { background: #ffd166; } .ebar-legend i.band-bad { background: #ff8a7a; }
+.ebar-legend i.is-none { background: repeating-linear-gradient(135deg, currentColor 0 1.5px, transparent 1.5px 4px); opacity: .6; }
+/* Page header on non-overview tabs: tighter, calmer */
+.hero:not(:has(.hero-score)) { padding: 28px 0 8px; }
+.hero:not(:has(.hero-score)) h1 { font-size: clamp(30px, 3.2vw, 40px); }
+.hero:not(:has(.hero-score)) p, .hero-note { max-width: 62ch; color: var(--muted); font-size: 15px; }
+.hero-id h1 { overflow-wrap: anywhere; hyphens: none; letter-spacing: -0.02em; }
+.intelligence-page h2, .repository-inspector-page h2, .repo-runs-panel h2 { font-size: 22px; line-height: 1.25; }
+.intelligence-page p, .repository-inspector-page p, .repo-runs-panel p { line-height: 1.55; max-width: 70ch; }
+.intel-kicker, .inspector-eyebrow { font-size: 13px; text-transform: none; letter-spacing: 0; }
+@media (max-width: 760px) {
+  .hero:has(.hero-score) { border-radius: 22px; padding: 22px; }
+  .hero:has(.hero-score) h1 { font-size: clamp(22px, 6.6vw, 30px); letter-spacing: -0.03em; }
+  .hero:has(.hero-score) .ebar-seg small { display: none; }
+  .hero:has(.hero-score) .ebar-legend { display: grid; color: #fff; }
+  .hero:has(.hero-score) .ebar-lg { --h: 14px; }
+  .ebar-legend { display: grid; }
+  .ebar-sm + .ebar-legend { display: none; }
+}

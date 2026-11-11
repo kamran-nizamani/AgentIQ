@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import handler from "../api/intelligence.js";
 
@@ -70,7 +70,9 @@ async function callHandler(url: string) {
   return { status: res.statusCode, headers: res.headers, body: JSON.parse(res.body) as any };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+// The fixtures use fixed dates, and health scoring depends on how recent activity is, so pin "now".
+beforeEach(() => vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-15T00:00:00Z") }));
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("Engineering Intelligence API", () => {
   it("keeps inaccessible dependency alerts unknown and renormalizes health over available evidence", async () => {

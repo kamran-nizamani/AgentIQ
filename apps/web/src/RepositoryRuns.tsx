@@ -118,7 +118,7 @@ export default function RepositoryRuns({ repository }: { repository: string }) {
 
   return <section className="panel repository-runs-panel">
     <div className="repo-runs-heading">
-      <div><span className="inspector-eyebrow">GITHUB ACTIONS · {repository}</span><h3>Complete workflow run history</h3><p>Browse paginated runs for the repository you inspected, filter by status, trigger, or branch, and open a run for job, step, commit, and artifact details.</p></div>
+      <div><span className="inspector-eyebrow">GitHub Actions · {repository}</span><h3>Complete workflow run history</h3><p>Browse paginated runs for the repository you inspected, filter by status, trigger, or branch, and open a run for job, step, commit, and artifact details.</p></div>
       {data && <div className="repo-runs-total"><strong>{data.total.toLocaleString()}</strong><span>runs reported</span></div>}
     </div>
     <form className="repo-runs-filters" onSubmit={applyBranch}>
