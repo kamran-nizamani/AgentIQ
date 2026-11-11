@@ -43,7 +43,9 @@ The collector stores workflow-run and job evidence, normalizes each run, and com
 
 ## Hanzo Decisions
 
-Set `HANZO_API_KEY` in the API server environment. The key is read only on the server and must never be exposed to the browser or committed to source control.
+Set `HANZO_API_KEY` in the API server environment for live requests. The key is read only on the server and must never be exposed to the browser or committed to source control.
+
+**No API key?** Enable the offline mock mode by setting `HANZO_MOCK_MODE=true` in the API server environment, then restart the API. The same `POST /api/decisions` endpoint will return deterministic sample answers without contacting Hanzo. Responses include `meta.mode: "mock"` and `data.mock: true`. Choice questions use simple keyword matching, yes/no questions use urgency keywords, and score questions return a fixed example score. This is for UI and integration testing only; it is not an AI decision and must not be used for real incident routing. Unset the variable (or set it to `false`) to return to live mode.
 
 Send a decision request to `POST /api/decisions` with a JSON body containing `state` and `questions`. The optional `model` defaults to `kai`. For example:
 
