@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
 import { createApiHandler, createDemoStore } from "./server.js";
 
@@ -42,6 +42,72 @@ describe("AgentIQ HTTP API", () => {
     expect(body.data.run.id).toBe("demo_8F2A");
     expect(body.data.evidence.evidence.length).toBeGreaterThan(0);
     expect(body.data.evaluation.evaluation.score).toBeTypeOf("number");
+  });
+
+
+  it("proxies a Hanzo decision and returns typed answers", async () => {
+    const previousKey = process.env.HANZO_API_KEY;
+    process.env.HANZO_API_KEY = "test-hanzo-key";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      answers: { team: { choice: "infrastructure", probabilities: { infrastructure: 0.98 } }, critical: { noul: 0.94 } },
+      routing: { checkpoint: "team,critical" },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const response = await fetch(`${baseUrl}/api/decisions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          state: { message: "502 errors" },
+          questions: {
+            team: { type: "choice", instructions: "Choose a team", criteria: { infrastructure: "network errors" } },
+            critical: { type: "noul", instructions: "Page on-call?" },
+          },
+        }),
+      });
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(body.data.answers.team.choice).toBe("infrastructure");
+      expect(body.data.answers.critical.noul).toBe(0.94);
+      expect(body.data.routing.checkpoint).toBe("team,critical");
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(new Headers(fetchMock.mock.calls[0]![1]?.headers).get("authorization")).toBe("Bearer test-hanzo-key");
+    } finally {
+      vi.unstubAllGlobals();
+      if (previousKey === undefined) delete process.env.HANZO_API_KEY;
+      else process.env.HANZO_API_KEY = previousKey;
+    }
+  });
+
+  it("preserves Hanzo billing and rate-limit refusals", async () => {
+    const previousKey = process.env.HANZO_API_KEY;
+    process.env.HANZO_API_KEY = "test-hanzo-key";
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "RATE_LIMITED", message: "Too many requests", actions: ["Retry later"] },
+    }), { status: 429 })));
+    try {
+      const response = await fetch(`${baseUrl}/api/decisions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: {}, questions: { critical: { type: "noul", instructions: "Page?" } } }),
+      });
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ error: { code: "RATE_LIMITED", actions: ["Retry later"] } });
+    } finally {
+      vi.unstubAllGlobals();
+      if (previousKey === undefined) delete process.env.HANZO_API_KEY;
+      else process.env.HANZO_API_KEY = previousKey;
+    }
+  });
+
+  it("validates Hanzo decision request bodies", async () => {
+    const response = await fetch(`${baseUrl}/api/decisions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state: {}, questions: {} }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "INVALID_REQUEST" } });
   });
 
   it("returns a stable 404 response for unknown run IDs", async () => {
