@@ -13,7 +13,11 @@ export function ingestGitHubActionsRun(input:GitHubActionsEvidenceInput):Evidenc
 }
 export function ingestTestEvidence(input:TestEvidenceInput):Evidence {
   return makeEvidence("test-suite:"+input.sourceId,"test-suite","test-report",input.sourceId,{
-    framework:input.framework,total:input.total,passed:input.passed,failed:input.failed,skipped:input.skipped??0,durationMs:input.durationMs??null
+    framework:input.framework,total:input.total,passed:input.passed,failed:input.failed,skipped:input.skipped??0,durationMs:input.durationMs??null,
+    ...(input.repository ? { repository: input.repository } : {}),
+    ...(input.workflowRunId !== undefined ? { workflowRunId: String(input.workflowRunId) } : {}),
+    ...(input.commitSha ? { commitSha: input.commitSha } : {}),
+    ...(input.jobId !== undefined ? { jobId: String(input.jobId) } : {})
   });
 }
 export function ingestGitDiffEvidence(input:GitDiffEvidenceInput):Evidence {
